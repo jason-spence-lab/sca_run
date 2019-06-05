@@ -63,5 +63,5 @@ Any questions, comments and/or feedback are welcome!
 
 ## Acknowledgments
 
-* **Jason Spence Lab** - [website](http://www.jasonspencelab.com/) - for support from our colleagues
-* **Theis Lab** - [website](https://github.com/theislab) - and **Satija Lab** - [webiste](https://satijalab.org/) - for their work on modern single cell analysis techniques
+* [**Jason Spence Lab**](http://www.jasonspencelab.com/) for support from our colleagues
+* [**Theis Lab**](https://github.com/theislab) and [**Satija Lab**](https://satijalab.org/) for their work on modern single cell analysis techniques
