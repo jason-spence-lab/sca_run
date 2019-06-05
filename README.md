@@ -57,7 +57,7 @@ Give an example
 ## Authors
 
 * **Joshua Wu** wujos@med.umich.edu
-* **Mike Czerwinski** czerwm@med.umich.edu
+* **Mike Czerwinski** czerwmj@med.umich.edu
 
 Any questions, comments and/or feedback are welcome!
 
