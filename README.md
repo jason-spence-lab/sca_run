@@ -10,11 +10,14 @@ To understand the single cell analysis tools, check out the Scanpy and Seurat tu
 
 ## Data Storage
 
-We keep track of our data using a meta-data table in a .tsv file. Each sample is represented by a line such as below.
-
+We keep track of our data using a meta-data table in a .tsv file. Each sample is represented in the table with the following format
 
 ```
-2182-1	01_RNAseq_RAW_Data/Run_2182_Czerwinski_HIO_fetal_intestine_scRNAseq/Data/Intensities/BaseCalls/1-HIO-Fresh/outs/filtered_gene_bc_matrices_h5.h5	age:30	tissue:HIO	gel:Matrigel	media:ENR	sex:Male	sampleName:1-HIO-Fresh
+<Sample ID Number> <path/to/raw_data_matrix.h5>	<metadata fields>
+```
+**Example**
+```
+2182-1 01_RNAseq_RAW_Data/Run_2182_Czerwinski_HIO_fetal_intestine_scRNAseq/Data/Intensities/BaseCalls/1-HIO-Fresh/outs/filtered_gene_bc_matrices_h5.h5	age:30	tissue:HIO	gel:Matrigel	media:ENR	sex:Male	sampleName:1-HIO-Fresh
 ```
 
 <!-- ### Prerequisites
