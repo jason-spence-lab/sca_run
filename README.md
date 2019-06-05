@@ -1,12 +1,14 @@
-# Project Title
+# Single Cell Analysis Applications in Python
 
-One Paragraph of project description goes here
+This repository contains applications of [Scanpy](https://github.com/theislab/scanpy) used by the Jason Spence Lab. 
 
 ## Getting Started
 
-These instructions will get you a copy of the project up and running on your local machine for development and testing purposes. See deployment for notes on how to deploy the project on a live system.
+To run this project, install Scanpy from [here](https://github.com/theislab/scanpy). Make sure to have a recent version of Python. As of June 2019, we are using Python version 3.7.3.
 
-### Prerequisites
+To understand the single cell analysis tools, check out the Scanpy and Seurat tutorials side-by-side [here](https://scanpy-tutorials.readthedocs.io/en/latest/pbmc3k.html) and [here](https://satijalab.org/seurat/v3.0/pbmc3k_tutorial.html)
+
+<!-- ### Prerequisites
 
 What things you need to install the software and how to install them
 
@@ -50,38 +52,16 @@ Explain what these tests test and why
 
 ```
 Give an example
-```
-
-## Deployment
-
-Add additional notes about how to deploy this on a live system
-
-## Built With
-
-* [Dropwizard](http://www.dropwizard.io/1.0.2/docs/) - The web framework used
-* [Maven](https://maven.apache.org/) - Dependency Management
-* [ROME](https://rometools.github.io/rome/) - Used to generate RSS Feeds
-
-## Contributing
-
-Please read [CONTRIBUTING.md](https://gist.github.com/PurpleBooth/b24679402957c63ec426) for details on our code of conduct, and the process for submitting pull requests to us.
-
-## Versioning
-
-We use [SemVer](http://semver.org/) for versioning. For the versions available, see the [tags on this repository](https://github.com/your/project/tags). 
+``` -->
 
 ## Authors
 
-* **Billie Thompson** - *Initial work* - [PurpleBooth](https://github.com/PurpleBooth)
+* **Joshua Wu** wujos@med.umich.edu
+* **Mike Czerwinski** czerwm@med.umich.edu
 
-See also the list of [contributors](https://github.com/your/project/contributors) who participated in this project.
-
-## License
-
-This project is licensed under the MIT License - see the [LICENSE.md](LICENSE.md) file for details
+Any questions, comments and/or feedback are welcome!
 
 ## Acknowledgments
 
-* Hat tip to anyone whose code was used
-* Inspiration
-* etc
+* **Jason Spence Lab** - [website](http://www.jasonspencelab.com/) - for support from our colleagues
+* **Theis Lab** - [website](https://github.com/theislab) - and **Satija Lab** - [webiste](https://satijalab.org/) - for their work on modern single cell analysis techniques

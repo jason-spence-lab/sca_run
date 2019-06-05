@@ -54,5 +54,5 @@ sca.pipe_basic(sca_dict,figdir)
 # 						min_dist = 0.4,
 # 						resolution = 0.4)
 
-# sca.pipe_ext(sca_dict,analysis_params_ext, figdir=figdir)#, load_save='adata_save.p')
+# sca.pipe_ext(sca_dict,analysis_params_ext, figdir=figdir, extracted=2)#, load_save='adata_save.p')
 
