@@ -13,7 +13,7 @@ To understand the single cell analysis tools, check out the Scanpy and Seurat tu
 We keep track of our data using a meta-data table in a .tsv file. Each sample is represented in the table with the following format
 
 ```
-<Sample ID Number> <path/to/raw_data_matrix.h5>	<metadata fields>
+<Sample ID Number> <path/from/storage_mount_point/to/raw_data_matrix.h5>	<metadata fields>
 ```
 **Example**
 ```
