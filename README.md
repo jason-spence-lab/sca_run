@@ -8,6 +8,14 @@ To run this project, install Scanpy from [here](https://github.com/theislab/scan
 
 To understand the single cell analysis tools, check out the Scanpy and Seurat tutorials side-by-side [here](https://scanpy-tutorials.readthedocs.io/en/latest/pbmc3k.html) and [here](https://satijalab.org/seurat/v3.0/pbmc3k_tutorial.html)
 
+## Data Storage
+
+We keep track of our data using a meta-data table in a .tsv file. Each sample is represented by a line such as below.
+
+'''
+2182-1	01_RNAseq_RAW_Data/Run_2182_Czerwinski_HIO_fetal_intestine_scRNAseq/Data/Intensities/BaseCalls/1-HIO-Fresh/outs/filtered_gene_bc_matrices_h5.h5	age:30	tissue:HIO	gel:Matrigel	media:ENR	sex:Male	sampleName:1-HIO-Fresh
+'''
+
 <!-- ### Prerequisites
 
 What things you need to install the software and how to install them
