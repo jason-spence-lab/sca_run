@@ -39,7 +39,7 @@ sca_dict.update(analysis_params = dict(n_neighbors = 15, # Size of the local nei
 								n_pcs = 11, # Number of principle components to use in construction of neighborhood graph
 								spread = 1, # In combination with min_dist determines how clumped embedded points are
 								min_dist = 0.4, # Minimum distance between points on the umap graph
-								resolution = 0.25)) # High resolution attempts to increases # of clusters identified
+								resolution = 0.5)) # High resolution attempts to increases # of clusters identified
 
 ## Basic pipeline for analysis - will filter data, process, cluster, etc. and output relevant figures
 sca.pipe_basic(sca_dict,figdir)

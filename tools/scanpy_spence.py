@@ -239,12 +239,12 @@ def load_data(storage_mount_point, sample_list):
 
 ## Filters data based on certain parameters
 # Attempts to remove "bad" data such as dead cells, doublets, etc.
-#def filter_data(adata, sca_dict):
 def filter_data(adata, min_cells=0, min_genes=500, max_counts=50000, max_genes=8000, max_mito=0.1):
 	'''
 	Removes cells expressing low to no genes, and genes expressed in few to no cells
 	Filters out cells based on mitochondrial genes, UMI and max gene expression
 	'''
+
 	summary_dict = dict()
 	summary_dict.update(initial_cell_count=len(adata.obs_names), initial_gene_count=len(adata.var_names))
 	## Basic filtering to get rid of useless cells and unexpressed genes
@@ -286,23 +286,24 @@ def preprocess_data(adata, summary_dict):
 	sc.pp.highly_variable_genes(adata, min_mean=0.0125, max_mean=3, min_disp=0.5)
 
 	## Filter the genes to remove non-variable genes since they are uninformative
-	adata = adata[:, adata.var['highly_variable']]
+	adata = adata[:, adata.var['highly_variable']].copy()
 
 	## Regress out effects of total reads per cell and the percentage of mitochondrial genes expressed.
-	sc.pp.filter_genes(adata, min_counts=1) # 0 columns negatively affect the convergence of regresion
-	sc.pp.regress_out(adata, ['n_counts'])#,'percent_mito'])
+	#sc.pp.filter_genes(adata, min_counts=1) # 0 columns negatively affect the convergence of regresion
+	sc.pp.regress_out(adata, ['n_counts','percent_mito'])
+	#print(adata.X)
 
 	print('\nDoing, final filtering...\nKeeping', len(adata.obs_names),'cells and', len(adata.var_names),'genes.\n')	
 	summary_dict.update(final_cell_count=len(adata.obs_names), final_gene_count=len(adata.var_names))
+
+	#sc.pp.filter_cells(adata, min_genes=1) # Remove 0 columns that may have occured in sectioning of data after preprocessing
 
 	## Scale each gene to unit variance. Clip values exceeding standard deviation 10 to remove extreme outliers
 	sc.pp.scale(adata, max_value=10)
 	return [adata,summary_dict]
 
 ## Run dimensional reduction analysis and clustering using KNN graph
-#def run_analysis(adata, sca_dict):
 def run_analysis(adata, n_neighbors=15, n_pcs=11, spread=1, min_dist=0.4, resolution=0.4):
-	#sc.pp.filter_genes(adata, min_cells=1) # Remove 0 columns that may have occured in sectioning of data after preprocessing
 
 	## Run PCA to compute the default number of components
 	sc.tl.pca(adata, svd_solver='arpack')
@@ -319,7 +320,10 @@ def run_analysis(adata, n_neighbors=15, n_pcs=11, spread=1, min_dist=0.4, resolu
 	#bbknn.bbknn(adata, batch_key='sampleName', neighbors_within_batch=5, save_knn=False, copy=False)
 
 	## Run UMAP Dim reduction
-	sc.tl.umap(adata, spread=spread, min_dist=min_dist) # Min_dist needs to be between 0.01 to 0.5
+	sc.tl.umap(adata, spread=spread, min_dist=min_dist)#, alpha=2, init_pos='random') # Min_dist needs to be between 0.01 to 0.5
+
+	## Run tSNE analysis
+	sc.tl.tsne(adata, n_pcs=n_pcs)
 
 	## Calculate cell clusters via Louvain algorithm
 	sc.tl.louvain(adata, resolution=resolution)
@@ -367,7 +371,6 @@ def plot_sca(adata, sca_dict, adata_preFiltering=None, figdir='./figures',
 
 	## Draw the PCA elbow plot to determine which PCs to use
 	sc.pl.pca_variance_ratio(adata_postPCA, log=True, n_pcs=100, save='_elbowPlot.png', show=False)
-	#print(adata.post_PCA)
 
 
 	## Plot results of UMAP dimensional reduction and clustering
@@ -402,39 +405,50 @@ def plot_sca(adata, sca_dict, adata_preFiltering=None, figdir='./figures',
 	sc.pl.umap(adata, color=missing_genes, save='_featureplots_gray.png', show=False, cmap=gray_cmap, size=20, use_raw=True)
 
 
+	## tSNE Plots
+	sc.pl.tsne(adata, color='louvain', save = '_clusterIdentity.png', show = False, 
+				legend_loc = 'right margin', edges = False, size = 20, 
+				palette = colors, alpha = 0.75)
+	sc.pl.tsne(adata, color='sampleName', save = '_sample.png', show = False, 
+				legend_loc = 'right margin', edges = False, size = 20, 
+				palette = colors, alpha = 0.75)
+	sc.pl.tsne(adata, color=genes_to_plot, save = '_featureplots.png', show = False, cmap = my_feature_cmap, size = 25, use_raw = True)
+	sc.pl.tsne(adata, color=missing_genes, save='_featureplots_gray.png', show=False, cmap=gray_cmap, size=20, use_raw=True)
+
+
 	## Dotplot analysis
 	# Circle color corresponds to expression level, and circle size corresponds to percentage of cells expressing gene
 	group_positions = [(0,5),(6,8),(9,10),(11,13),(14,16)] # Manually set and determined
 	group_labels = ['Endothelial','Epithelial','Immune','Mesenchyme','Neuronal']
-	sc.pl.dotplot(adata, genes_to_plot, groupby='louvain', var_group_positions=group_positions, var_group_labels=group_labels,
+	sc.pl.dotplot(adata, genes_to_plot, groupby='louvain', #var_group_positions=group_positions, var_group_labels=group_labels,
 				save='_markers.png', show=False, dendrogram='dendrogram_louvain', use_raw=True)
-
-
-	## Violin plot for comparing gene expression among different groups/clusters
-	# Create observation field labeled using binary information
-	# Will have option integrated in pipeline in the future
-	adata.obs['CDH5_exp'] = ['CDH5+' if (cell!=0) else 'CDH5-' for cell in adata.raw[:,'CDH5'].X] 
-
-	# Built in scanpy module
-	sc.pl.violin(adata, genes_to_plot+['CDH5'], groupby='CDH5_exp', jitter=True,
-		save='_feature.png', show=False, scale='width',use_raw=True) #order = ['CDH5+','CDH5-'],
 	
-	# Custom violin plot module -- Not complete/in testing
-	df = pd.DataFrame()
-	# Add Gaussian y-jitter to better visualize zero expression in violin plots
-	for gene in genes_to_plot:
-		sigma = np.amax(adata.raw[:,gene].X)/40
-		gene_df = [cell if (cell!=0) else np.random.normal(loc=0,scale=sigma) for cell in adata.raw[:,gene].X]
-		df[gene] = gene_df
 
-	df['CDH5_exp']=adata.obs['CDH5_exp'].values
-	vplot, axes = plt.subplots(math.ceil(len(genes_to_plot)/4),4, figsize=(18,12))
-	plt.rcParams.update({'font.size':12})
-	plt.subplots_adjust(left=0.125, right=0.9, bottom=0.1, top=0.9, wspace=0.4, hspace=0.4)
-	for i,gene in enumerate(genes_to_plot):
-		sns.violinplot(x='CDH5_exp', y=gene, data=df, inner=None, scale='width', ax=axes[math.floor(i/4),i%4])
-		sns.stripplot(x='CDH5_exp', y=gene, data=df, jitter = True, color='black', size=0.4, ax=axes[math.floor(i/4),i%4])
-	vplot.savefig(''.join([figdir,'/violin_feature_jitter.png']))
+	# ## Violin plot for comparing gene expression among different groups/clusters
+	# # Create observation field labeled using binary information
+	# # Will have option integrated in pipeline in the future
+	# adata.obs['CDH5_exp'] = ['CDH5+' if (cell!=0) else 'CDH5-' for cell in adata.raw[:,'CDH5'].X] 
+
+	# # Built in scanpy module
+	# sc.pl.violin(adata, genes_to_plot+['CDH5'], groupby='CDH5_exp', jitter=True,
+	# 	save='_feature.png', show=False, scale='width',use_raw=True) #order = ['CDH5+','CDH5-'],
+	
+	# # Custom violin plot module -- Not complete/in testing
+	# df = pd.DataFrame()
+	# # Add Gaussian y-jitter to better visualize zero expression in violin plots
+	# for gene in genes_to_plot:
+	# 	sigma = np.amax(adata.raw[:,gene].X)/40
+	# 	gene_df = [cell if (cell!=0) else np.random.normal(loc=0,scale=sigma) for cell in adata.raw[:,gene].X]
+	# 	df[gene] = gene_df
+
+	# df['CDH5_exp']=adata.obs['CDH5_exp'].values
+	# vplot, axes = plt.subplots(math.ceil(len(genes_to_plot)/4),4, figsize=(18,12))
+	# plt.rcParams.update({'font.size':12})
+	# plt.subplots_adjust(left=0.125, right=0.9, bottom=0.1, top=0.9, wspace=0.4, hspace=0.4)
+	# for i,gene in enumerate(genes_to_plot):
+	# 	sns.violinplot(x='CDH5_exp', y=gene, data=df, inner=None, scale='width', ax=axes[math.floor(i/4),i%4])
+	# 	sns.stripplot(x='CDH5_exp', y=gene, data=df, jitter = True, color='black', size=0.4, ax=axes[math.floor(i/4),i%4])
+	# vplot.savefig(''.join([figdir,'/violin_feature_jitter.png']))
 
 
 	# Set the thresholds and scaling factors for drawing the paga map/plot
@@ -467,6 +481,8 @@ def pipe_basic(sca_dict, figdir='./figures/', load_save=None, new_save='adata_sa
 		adata = pickle.load(open(''.join([figdir,load_save]),"rb"))
 	else:
 		[adata,annotation_dict] = load_data(sca_dict['storage_mount_point'],sca_dict['sample_list'])
+
+		adata = filter_specific_genes(adata,text_file = 'problematic_blood_genes.txt')
 
 		## Filter and process data
 		[adata,adata_preFiltered,summary_dict] = filter_data(adata,**(sca_dict['filter_params']))
