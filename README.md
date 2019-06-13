@@ -1,6 +1,6 @@
 # Single Cell Analysis Applications in Python
 
-This repository contains applications of [Scanpy](https://github.com/theislab/scanpy) used by the Jason Spence Lab. basic_analysis_script.py contains a basic outline to run a single cell RNA sequencing analysis. scanpy_spence.py contains our collection of functions used to run the analysis.
+This repository contains applications of [Scanpy](https://github.com/theislab/scanpy) used by the Jason Spence Lab. **basic_analysis_script.py** contains a basic outline to run a single cell RNA sequencing analysis. **scanpy_spence.py** contains our collection of functions used to run the analysis.
 
 ## Getting Started
 
