@@ -1,6 +1,6 @@
 # Single Cell Analysis Applications in Python
 
-This repository contains applications of [Scanpy](https://github.com/theislab/scanpy) used by the Jason Spence Lab. 
+This repository contains applications of [Scanpy](https://github.com/theislab/scanpy) used by the Jason Spence Lab. **basic_analysis_script.py** contains a basic outline to run a single cell RNA sequencing analysis. **scanpy_spence.py** contains our collection of functions used to run the analysis.
 
 ## Getting Started
 
@@ -19,6 +19,7 @@ We keep track of our data using a meta-data table in a .tsv file. Each sample is
 ```
 2182-1 01_RNAseq_RAW_Data/Run_2182_Czerwinski_HIO_fetal_intestine_scRNAseq/Data/Intensities/BaseCalls/1-HIO-Fresh/outs/filtered_gene_bc_matrices_h5.h5 age:30 tissue:HIO gel:Matrigel media:ENR sex:Male sampleName:1-HIO-Fresh
 ```
+
 
 <!-- ### Prerequisites
 
