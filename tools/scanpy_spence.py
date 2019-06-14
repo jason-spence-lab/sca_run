@@ -433,13 +433,13 @@ def plot_sca(adata, sca_dict, adata_preFiltering=None, figdir='./figures',
 	# sc.pl.violin(adata, genes_to_plot+['CDH5'], groupby='CDH5_exp', jitter=True,
 	# 	save='_feature.png', show=False, scale='width',use_raw=True) #order = ['CDH5+','CDH5-'],
 	
-	# # Custom violin plot module -- Not complete/in testing
-	# df = pd.DataFrame()
-	# # Add Gaussian y-jitter to better visualize zero expression in violin plots
-	# for gene in genes_to_plot:
-	# 	sigma = np.amax(adata.raw[:,gene].X)/40
-	# 	gene_df = [cell if (cell!=0) else np.random.normal(loc=0,scale=sigma) for cell in adata.raw[:,gene].X]
-	# 	df[gene] = gene_df
+	# Custom violin plot module -- Not complete/in testing
+	df = pd.DataFrame()
+	# Add Gaussian y-jitter to better visualize zero expression in violin plots
+	for gene in genes_to_plot:
+		sigma = np.amax(adata.raw[:,gene].X)/40
+		gene_df = [cell if (cell!=0) else np.random.normal(loc=0,scale=sigma) for cell in adata.raw[:,gene].X]
+		df[gene] = gene_df
 
 	# df['CDH5_exp']=adata.obs['CDH5_exp'].values
 	# vplot, axes = plt.subplots(math.ceil(len(genes_to_plot)/4),4, figsize=(18,12))
@@ -450,6 +450,13 @@ def plot_sca(adata, sca_dict, adata_preFiltering=None, figdir='./figures',
 	# 	sns.stripplot(x='CDH5_exp', y=gene, data=df, jitter = True, color='black', size=0.4, ax=axes[math.floor(i/4),i%4])
 	# vplot.savefig(''.join([figdir,'/violin_feature_jitter.png']))
 
+	adata.obs['jitter'] = np.random.rand(len(adata.obs_names))*10
+
+	sc.pl.scatter(adata,x='jitter',y='n_genes',color='louvain',save='_n_genes.png',palette=colors,show=False)
+
+	sc.pl.scatter(adata,x='jitter',y='n_counts',color='louvain',save='_n_counts.png',palette=colors,show=False)
+
+	sc.pl.scatter(adata,x='jitter',y='percent_mito',color='louvain',save='_percent_mito.png',palette=colors,show=False)
 
 	# Set the thresholds and scaling factors for drawing the paga map/plot
 	node_size_scale=1.25
