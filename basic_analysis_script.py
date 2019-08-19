@@ -46,7 +46,7 @@ sca.pipe_basic(sca_dict,figdir)
 
 
 ## If you find some interesting clusters that you want to "zoom in" on and recluster, you can use the following code
-# Will 
+
 # New analysis parameters for the subset of parameters
 # analysis_params_ext = dict(n_neighbors = 9,
 # 						n_pcs = 10,
