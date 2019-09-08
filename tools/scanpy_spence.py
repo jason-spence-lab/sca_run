@@ -8,7 +8,6 @@ Read more about Scanpy at https://scanpy.readthedocs.io/en/latest/index.html
 
 '''
 
-
 import numpy as np
 import pandas as pd
 import scanpy as sc
@@ -122,7 +121,7 @@ def write_rank_genes(adata, groupby, figdir='./figures'):
 	rank_genes_data.pop('params')
 
 	for cluster in adata.obs[groupby].cat.categories:
-		csv_fileName = ''.join([figdir,'/csv_files/',cluster,'_clustercompare.csv'])
+		csv_fileName = ''.join([figdir,'/csv_files/',cluster,'_',groupby,'_clustercompare.csv'])
 		os.makedirs(os.path.dirname(csv_fileName), exist_ok=True) # Make file if it doesn't exist already
 		with open(csv_fileName,'w',newline='') as f:
 			wr = csv.writer(f)
@@ -271,7 +270,7 @@ def filter_data(adata, min_cells=0, min_genes=500, max_counts=50000, max_genes=8
 
 ## Standardize and normalize the data set
 # Includes additional processing such as removing biased and uninformative data
-def preprocess_data(adata, summary_dict):
+def preprocess_data(adata):
 	## Normalize the expression matrix to 10,000 reads per cell, so that counts become comparable among cells.
 	# This corrects for differences in sequencing depth between cells and samples
 	sc.pp.normalize_total(adata)
@@ -292,33 +291,33 @@ def preprocess_data(adata, summary_dict):
 	## Regress out effects of total reads per cell and the percentage of mitochondrial genes expressed.
 	#sc.pp.filter_genes(adata, min_counts=1) # 0 columns negatively affect the convergence of regresion
 	sc.pp.regress_out(adata, ['n_counts','percent_mito'])
-	#print(adata.X)
 
-	print('\nDoing, final filtering...\nKeeping', len(adata.obs_names),'cells and', len(adata.var_names),'genes.\n')	
-	summary_dict.update(final_cell_count=len(adata.obs_names), final_gene_count=len(adata.var_names))
+	print('\nDoing, final filtering...\nKeeping', len(adata.obs_names),'cells and', len(adata.var_names),'genes.\n')
 
 	#sc.pp.filter_cells(adata, min_genes=1) # Remove 0 columns that may have occured in sectioning of data after preprocessing
 
 	## Scale each gene to unit variance. Clip values exceeding standard deviation 10 to remove extreme outliers
 	sc.pp.scale(adata, max_value=10)
-	return [adata,summary_dict]
+	return adata
 
 ## Run dimensional reduction analysis and clustering using KNN graph
-def run_analysis(adata, n_neighbors=15, n_pcs=11, spread=1, min_dist=0.4, resolution=0.4):
-
+def run_analysis(adata, n_neighbors=15, n_pcs=11, spread=1, min_dist=0.4, resolution=0.4, do_bbknn=False):
 	## Run PCA to compute the default number of components
 	sc.tl.pca(adata, svd_solver='arpack')
 
 	## Save the existing data to disk for later
 	adata_postPCA = adata.copy()
+	#sc.pp.combat(adata, key='sampleName', covariates={'HT239-ESO-2D':1,'HT239_ESO':0})
 
 	## Compute nearest-neighbors
 	sc.pp.neighbors(adata, n_neighbors=n_neighbors, n_pcs=n_pcs)
 
 	## Remove batch effects
 	# Note that doing this may override previous sc.pp.neighbors()
-	# import bbknn
-	# bbknn.bbknn(adata, batch_key='sampleName', neighbors_within_batch=n_neighbors,copy=False)
+	if do_bbknn:
+		import bbknn
+		bbknn.bbknn(adata, batch_key='sampleName', copy=False)
+		#sc.pp.external.mnn_correct(adata,batch_key='sampleName')
 
 	## Run UMAP Dim reduction
 	sc.tl.umap(adata, spread=spread, min_dist=min_dist)#, alpha=2, init_pos='random') # Min_dist needs to be between 0.01 to 0.5
@@ -331,12 +330,15 @@ def run_analysis(adata, n_neighbors=15, n_pcs=11, spread=1, min_dist=0.4, resolu
 
 	## Run PAGA to predict non-directional cluster-cluster relationships to infer possible developmental progressions
 	sc.tl.paga(adata, groups='louvain', model='v1.2')
+
+	## Do Dendrogram analysis based on PCs
+	sc.tl.dendrogram(adata,groupby='louvain',n_pcs=n_pcs,linkage_method="median",use_raw=True)
 	return [adata,adata_postPCA]
 
 ## Variety of plotting and data display functions
 # Will make more robust in the future
 def plot_sca(adata, sca_dict, adata_preFiltering=None, figdir='./figures',
-			annotation_dict=None, summary_dict=None, adata_postPCA=None):
+			annotation_dict=None, summary_dict=None, adata_postPCA=None, final_quality=False):
 	'''
 	See the Scanpy visualization library for examples
 	'''
@@ -357,10 +359,20 @@ def plot_sca(adata, sca_dict, adata_preFiltering=None, figdir='./figures',
 			(1,0.5,0),(0,0.5,1),(0.5,1,0),(0.5,0,1),(1,0,0.5),(0,1,0.5)]
 
 	## General figure parameters and settings
-	sc.set_figure_params(dpi_save=500)
+	sc.set_figure_params(dpi_save=300,dpi=300)#,vector_friendly=False)
 	sc.settings.figdir = figdir
-	sc.settings.set_figure_params(fontsize=12)
+	sc.set_figure_params(fontsize=12)
+	size = sca_dict['plot_params']['size']
 
+	# Check to see if user wants publication quality figures
+	if final_quality:
+		rcParams['figure.figsize'] = 4, 4
+		rcParams['savefig.dpi']=1200
+		file_type = '.pdf'
+	else:
+		file_type = '.png'
+	
+	summary_dict.update(final_cell_count=len(adata.obs_names), final_gene_count=len(adata.var_names))
 	# ## Write a summary of the analysis to a text file including sample information and parameters
 	write_summary(adata,sca_dict,annotation_dict,summary_dict)
 
@@ -371,7 +383,6 @@ def plot_sca(adata, sca_dict, adata_preFiltering=None, figdir='./figures',
 	sc.pl.violin(adata, ['n_genes','n_counts','percent_mito'],
 				 jitter=0.4, multi_panel=True, save='_postFiltering_plot.png', show=False)
 
-
 	## Draw the PCA elbow plot to determine which PCs to use
 	sc.pl.pca_variance_ratio(adata_postPCA, log=True, n_pcs=100, save='_elbowPlot.png', show=False)
 	## Ranks and displays most contributing genes for each principal component
@@ -380,25 +391,34 @@ def plot_sca(adata, sca_dict, adata_preFiltering=None, figdir='./figures',
 	sc.pl.pca_loadings(adata_postPCA, components=loadings_components, save='_rank_genes.png', show=False)
 
 	## Plot results of UMAP dimensional reduction and clustering
-	# Color UMAP by cluster
-	sc.pl.umap(adata, color='louvain', save='_clusterIdentity.png', show=False,
-				legend_loc='on data', edges=False, size=5, palette=colors, alpha=0.75)
-	# Color UMAP by sample
-	sc.pl.umap(adata, color='sampleName', save='_sample.png', show=False, 
-				legend_loc='right margin', edges=False, size=5, 
-				palette=colors, alpha = 0.75)
-	# Color UMAP by tissue
-	sc.pl.umap(adata, color='age', save = '_tissue.png', show = False, 
-				legend_loc = 'right margin', edges = False, size = 10, palette = 'tab10', alpha = 0.75)
-
+	for observation in sca_dict['plot_params']['umap_obs']:
+		legend = 'on data' if (observation=='louvain') else 'right margin'
+		sc.pl.umap(adata, color=observation, save=''.join(['_',observation,file_type]), show=False,
+				   legend_loc=legend, edges=False, size=size, palette=colors, alpha=0.75)
 
 	## Find marker genes via Wilxocon test based on Louvain cluster assignment
 	# Create a simple plot to show the top 25 most significant markers for each cluster
 	# Write most significant markers to a csv file
 	# adata.obs['is_adult'] = ['Adult' if cell=='ND15989_Fresh_WT_Lung_Adult' else 'Fetal' for cell in adata.obs['sampleName']]
-	# rank_genes(adata,'is_adult',figdir=figdir)
-	rank_genes(adata,'louvain',figdir=figdir,clusters2_compare=['1','4'])
+	# rank_grouping = 'age'
+	# rank_genes(adata,rank_grouping,figdir=figdir)#,clusters2_compare=['1','4'])
+	# sc.pl.rank_genes_groups_heatmap(adata, n_genes=100, use_raw=True, show=False, 
+	# 		save=''.join(['_rank_heatmap_',rank_grouping,file_type]), cmap=my_feature_cmap)
+	# sc.pl.rank_genes_groups_dotplot(adata, n_genes=5, use_raw=True, show=False, 
+	# 		save=''.join(['_rank_dotplot_',rank_grouping,file_type]), color_map=my_feature_cmap)
+	# sc.pl.rank_genes_groups_stacked_violin(adata, n_genes=5, use_raw=True, 
+	# 		show=False, save=''.join(['_rank_violin_',rank_grouping,file_type]))
 
+
+	rank_grouping = 'louvain'
+	n_genes_rank = 25
+	rank_genes(adata,rank_grouping,figdir=figdir)#,clusters2_compare=['1','4'])
+	sc.pl.rank_genes_groups_heatmap(adata, n_genes=n_genes_rank, use_raw=True, show=False, 
+			save=''.join(['_rank_heatmap_',rank_grouping,file_type]), cmap=my_feature_cmap)
+	sc.pl.rank_genes_groups_dotplot(adata, n_genes=n_genes_rank, use_raw=True, show=False, 
+			save=''.join(['_rank_dotplot_',rank_grouping,file_type]), color_map=my_feature_cmap)
+	sc.pl.rank_genes_groups_stacked_violin(adata, n_genes=n_genes_rank, use_raw=True, 
+			show=False, save=''.join(['_rank_violin_',rank_grouping,file_type]))
 
 	## Feature plots and dot plot analysis for each specified set of genes
 	#sc.pl.rank_genes_groups(adata, n_genes=25, sharey=False, save='_markerPlots.png', show=False)
@@ -411,32 +431,40 @@ def plot_sca(adata, sca_dict, adata_preFiltering=None, figdir='./figures',
 
 			## Do FeaturePlots for select genes
 			print('Plotting standard marker genes: ',genes_to_plot,'\n')
-			sc.pl.umap(adata, color=genes_to_plot, save= ''.join(['_featureplots_',gene_list,'.png']), show=False, cmap=my_feature_cmap, size=20, use_raw=True)
-			
-			## Dotplot analysis
-			# Circle color corresponds to expression level, and circle size corresponds to percentage of cells expressing gene
+			sc.pl.umap(adata, color=genes_to_plot, save= ''.join(['_featureplots_',gene_list,file_type]), show=False, 
+					   cmap=my_feature_cmap, size=size, use_raw=True)
+	
 			if gene_dict['positions'] and gene_dict['groups']:
 				group_positions = gene_dict['positions'] # Manually set and determined
 				group_labels = gene_dict['groups']
 			else:
 				group_positions = None
 				group_labels = None
-			sc.pl.dotplot(adata, genes_to_plot, groupby='age', var_group_positions=group_positions, var_group_labels=group_labels,
-					save=''.join(['_markers_',gene_list,'.png']), show=False, color_map=blue_orange_cmap, 
-					use_raw=True, dot_max=0.4)#,  dendrogram='dendrogram_louvain',)
 
+			if len(gene_dict['markers'])!=1:
+				for grouping in sca_dict['plot_params']['exp_grouping']:
+					## Dotplot analysis
+					# Circle color corresponds to expression level, and circle size corresponds to percentage of cells expressing gene
 
-	## Do FeaturePlots for select genes
-	# genes_to_plot, missing_genes = [],[]
-	# [genes_to_plot,missing_genes] = find_genes(adata,sca_dict['gene_list'])
+					## Reordering categories for dotplot or heatmap rows
+					#adata_temp = adata.copy()
+					#adata_temp.obs['louvain'] = adata.obs['louvain'].cat.reorder_categories(['3','5','0','4','2','1'],inplace = False)
 
-	# print('Plotting standard marker genes: ',genes_to_plot,'\n')
-	# sc.pl.umap(adata, color=genes_to_plot, save='_featureplots.png', show=False, cmap=my_feature_cmap, size=20, use_raw=True)
+					sc.pl.dotplot(adata, genes_to_plot, groupby=grouping, 
+							var_group_positions=group_positions, var_group_labels=group_labels,
+							save=''.join(['_markers_',gene_list,'_',grouping,file_type]), show=False, 
+							color_map=my_feature_cmap, use_raw=True, dot_max=0.4)
+					## Heatmaps
+					# Each horizontal line represents expression of one cell
+					sc.pl.heatmap(adata, genes_to_plot, groupby=grouping, 
+							var_group_positions=group_positions, var_group_labels=group_labels,
+							save=''.join(['_markers_',gene_list,'_',grouping,file_type]), show=False, 
+							cmap=my_feature_cmap, use_raw=True)
 
 	# Genes that are not expressed or are invariable are plotted using a grayscale
 	print('Plotting empty genes: ',missing_genes,'\n')
-	sc.pl.umap(adata, color=missing_genes, save='_featureplots_gray.png', show=False, cmap=gray_cmap, size=20, use_raw=True)
-
+	sc.pl.umap(adata, color=missing_genes, save=''.join(['_featureplots_gray',file_type]), 
+			show=False, cmap=gray_cmap, size=size, use_raw=True)
 
 	## tSNE Plots
 	# sc.pl.tsne(adata, color='louvain', save = '_clusterIdentity.png', show = False, 
@@ -475,12 +503,10 @@ def plot_sca(adata, sca_dict, adata_preFiltering=None, figdir='./figures',
 	# 	sns.stripplot(x='CDH5_exp', y=gene, data=df, jitter = True, color='black', size=0.4, ax=axes[math.floor(i/4),i%4])
 	# vplot.savefig(''.join([figdir,'/violin_feature_jitter.png']))
 
+	## Scatter plots to identify clusters that are high in 
 	adata.obs['jitter'] = np.random.rand(len(adata.obs_names))*10
-
 	sc.pl.scatter(adata,x='jitter',y='n_genes',color='louvain',save='_n_genes.png',palette=colors,show=False)
-
 	sc.pl.scatter(adata,x='jitter',y='n_counts',color='louvain',save='_n_counts.png',palette=colors,show=False)
-
 	sc.pl.scatter(adata,x='jitter',y='percent_mito',color='louvain',save='_percent_mito.png',palette=colors,show=False)
 
 	# Set the thresholds and scaling factors for drawing the paga map/plot
@@ -501,7 +527,7 @@ def plot_sca(adata, sca_dict, adata_preFiltering=None, figdir='./figures',
 	return adata
 
 ## Most basic pipeline - Input data and output all figures
-def pipe_basic(sca_dict, figdir='./figures/', load_save=None, new_save='adata_save.p', filter_specific_genes=None):
+def pipe_basic(sca_dict, figdir='./figures/', load_save=None, new_save='adata_save.p', remove_genes=None, final_quality=False):
 	'''
 	sca_dict is a dictionary of miscellaneous analysis information including
 	parameters, sample list and gene_lists
@@ -521,20 +547,20 @@ def pipe_basic(sca_dict, figdir='./figures/', load_save=None, new_save='adata_sa
 		[adata,annotation_dict] = load_data(sca_dict['storage_mount_point'],sca_dict['sample_list'])
 
 		## Remove specific genes from the analysis (such as experimentally observed contaminations)
-		if filter_specific_genes:
-			adata = filter_specific_genes(adata,text_file = filter_specific_genes)
+		if remove_genes:
+			adata = filter_specific_genes(adata,text_file = remove_genes)
 
 		## Filter and process data
 		[adata,adata_preFiltered,summary_dict] = filter_data(adata,**(sca_dict['filter_params']))
 		adata_preProcessed = adata.copy() # Save for later in case of necessary extraction
-		[adata,summary_dict] = preprocess_data(adata,summary_dict)
+		adata = preprocess_data(adata)
 
 	## Dimensional reduction and clustering - construction of the neighborhood graph
 	[adata,adata_postPCA] = run_analysis(adata,**(sca_dict['analysis_params']))
 
 	## Plot figures
 	adata = plot_sca(adata,sca_dict,adata_preFiltering=adata_preFiltered,figdir = figdir,
-		annotation_dict=annotation_dict, summary_dict=summary_dict, adata_postPCA=adata_postPCA)
+		annotation_dict=annotation_dict, summary_dict=summary_dict, adata_postPCA=adata_postPCA, final_quality=final_quality)
 
 	## Save all analysis information in a dictionary
 	adata_dict = dict()
@@ -548,11 +574,11 @@ def pipe_basic(sca_dict, figdir='./figures/', load_save=None, new_save='adata_sa
 	if new_save:
 		pickle.dump(adata_dict,open(''.join([figdir,new_save]),"wb"),protocol=4)
 
-	return adata_dict#[adata,adata_preFiltered,adata_preProcessed,annotation_dict,summary_dict]
+	return adata_dict
 
 ## Pipeline for analysis in which you extract interesting clusters/observations after an initial run
 # Extracts clusters to an filtered but unprocessed AnnData object, then reprocesses and reclusters
-def pipe_ext(sca_dict, analysis_params_ext, figdir='./figures/', extracted=None, load_save=None):
+def pipe_ext(sca_dict, analysis_params_ext, figdir='./figures/', extracted=None, load_save=None, final_quality=False, label=''):
 	'''
 	Allows loading of a saved pickle adata file, file must contained adata that has gone through a complete pipeline
 	Otherwise will complete a new full analysis, and then extracts clusters
@@ -578,13 +604,13 @@ def pipe_ext(sca_dict, analysis_params_ext, figdir='./figures/', extracted=None,
 		## Create an unprocessed AnnData object with the desired clusters
 		adata_ext = adata_preProcessed[adata.obs['louvain'].isin(extracted)].copy()
 		## Reprocess and recluster extracted cells
-		[adata_ext,summary_dict] = preprocess_data(adata_ext,summary_dict)
+		adata_ext = preprocess_data(adata_ext)
 	else:
 		print("Looking to extract based on gene expression of ",extracted)
 		[adata,annotation_dict] = load_data(sca_dict['storage_mount_point'],sca_dict['sample_list'])
 		[adata,adata_preFiltered,summary_dict] = filter_data(adata,**(sca_dict['filter_params']))
 		adata_preProcessed = adata.copy()
-		[adata,summary_dict] = preprocess_data(adata,summary_dict)
+		adata = preprocess_data(adata)
 		adata_ext = adata[adata.raw[:,extracted].X>1.5,:]
 
 	sca_dict_ext = copy.deepcopy(sca_dict)
@@ -593,6 +619,6 @@ def pipe_ext(sca_dict, analysis_params_ext, figdir='./figures/', extracted=None,
 
 	## Plot figures
 	adata_ext = plot_sca(adata_ext,sca_dict_ext,adata_preFiltering=adata_preFiltered,
-			figdir = ''.join([figdir,'extracted']),annotation_dict=annotation_dict, summary_dict=summary_dict,
-			adata_postPCA = adata_postPCA_ext)
+			figdir = ''.join([figdir,'extracted/',label]),annotation_dict=annotation_dict, summary_dict=summary_dict,
+			adata_postPCA = adata_postPCA_ext, final_quality=final_quality)
 
