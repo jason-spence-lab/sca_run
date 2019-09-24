@@ -77,7 +77,7 @@ class sca_run:
 	def set_filter_params(self, min_cells=0, min_genes=500, max_genes=7000, max_counts=30000, max_mito=0.1):
 		self.__set_param_attr(locals())
 
-	def set_analysis_params(self, n_neighbors=30, n_pcs=15, spread=1, min_dist=0.4, resolution=0.6):
+	def set_analysis_params(self, n_neighbors=30, n_pcs=15, spread=1, min_dist=0.4, resolution=0.6, remove_batch_effects=False):
 		self.__set_param_attr(locals())
 
 	def set_plot_params(self, size=20, umap_obs=['louvain','sampleName'], exp_grouping=['louvain'], umap_color='yellow_blue', final_quality=False):
@@ -190,9 +190,33 @@ class sca_run:
 				wr.writerow(self.__ele_swap(list(rank_genes_data.keys()),0,1))
 				wr.writerows(zip(*self.__ele_swap([params[cluster] for params in rank_genes_data.values()],0,1)))
 
+	def __cell_counter(self,adata):
+		#print(adata.obs['louvain'])
+		self.sample_counts = {}
+		self.louvain_counts = {}
+		for sample in adata.obs['sampleName'].cat.categories:
+			try:
+				self.sample_counts[sample] = {'sample_total':adata.obs['sampleName'].isin([sample]).value_counts()[True]}
+			except:
+				self.sample_counts[sample] = 0
+			for cluster in adata.obs['louvain'].cat.categories:
+				if not cluster in self.louvain_counts:
+					try:
+						self.louvain_counts[cluster] = {'louvain_total':adata.obs['louvain'].isin([cluster]).value_counts()[True]}
+					except:
+						self.louvain_counts[cluster] = 0
+
+				try:
+					self.sample_counts[sample][cluster] = self.louvain_counts[cluster][sample] = (adata.obs['sampleName'].isin([sample]) & adata.obs['louvain'].isin([cluster])).value_counts()[True]
+				except:
+					self.sample_counts[sample][cluster] = self.louvain_counts[cluster][sample] = 0
+
+		return 0
+
 	## Write a summary of the analysis run including sample information, parameters and filtering information
 	# Not completely up to date
 	def write_summary(self, figdir='./figures/'):
+		self.__cell_counter(self.adata)
 
 		fileName = ''.join([figdir,'summary.txt'])
 
@@ -227,6 +251,11 @@ class sca_run:
 			f.write(''.join(['Spread:  ',str(self.spread),'\n']))
 			f.write(''.join(['Min Dist:  ',str(self.min_dist),'\n']))
 			f.write(''.join(['Resolution:  ',str(self.resolution),'\n']))
+
+			f.write('\n--------Sample Cell Counts Used--------\n')
+			f.write(json.dumps(str(self.sample_counts)))
+			f.write('\n--------Sample Cell Counts Used--------\n')
+			f.write(json.dumps(str(self.louvain_counts)))
 
 		return 0
 
@@ -447,8 +476,8 @@ class sca_run:
 		gray_cmap = self.__make_cmap([(220,220,220),(220,220,220)], bit=True)
 
 		## Custom color palette for cluster plots and observation plots
-		colors = [(0.3,0.3,0.3),(1,0,0),(0,1,0),(0,0,0.9),(1,0,1),(0,1,1),(0.9,0.9,0),
-				(0.85,0.5,0.5),(0.5,0.85,0.5),(0.5,0.5,0.85),
+		colors = [(0.5,0.85,0.5),(1,0,0),(0,1,0),(0,0,0.9),(1,0,1),(0,1,1),(0.9,0.9,0),
+				(0.3,0.3,0.3),(0.85,0.5,0.5),(0.5,0.5,0.85),
 				(0.15,0.5,0.5),(0.5,0.15,0.5),(0.5,0.5,0.15),
 				(1,0.5,0),(0,0.5,1),(0.5,1,0),(0.5,0,1),(1,0,0.5),(0,1,0.5)]
 
@@ -654,7 +683,7 @@ class sca_run:
 			pickle.dump(self,open(''.join([figdir,new_save]),"wb"),protocol=4)
 
 		## Write a summary of the analysis to a text file including sample information and parameters
-		self.write_summary()
+		self.write_summary(figdir=figdir)
 
 		print("\nAll done!\n")
 
@@ -703,15 +732,15 @@ class sca_run:
 		self.run_analysis(adata_ext)
 
 		## Plot figures
-		adata_ext = self.plot_sca(adata_ext,figdir = ''.join([figdir,'extracted/',label]))
+		adata_ext = self.plot_sca(adata_ext,figdir = ''.join([figdir,'extracted/',label,'/']))
 
 		self.adata = adata_ext.copy()
 		## Save analysis information and relevant AnnData objects to the disk using the Pickle module
 		if new_save:
-			pickle.dump(self,open(''.join([figdir,'extracted/',new_save]),"wb"),protocol=4)
+			pickle.dump(self,open(''.join([figdir,'extracted/',label,'/',new_save]),"wb"),protocol=4)
 
 		## Write a summary of the analysis to a text file including sample information and parameters
-		self.write_summary()
+		self.write_summary(figdir=figdir)
 
 		print("\nAll done!\n")
 
