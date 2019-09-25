@@ -68,11 +68,12 @@ class sca_run:
 		self.adata_preFiltered = None
 		self.adata_preProcessed = None
 
-	def add_gene_list(self, markers=[], label='basic_list', positions=None, groups=None):
+	def add_gene_list(self, markers=[], label='basic_list', feature_positions=None, feature_groups=None, groupby_positions=None):
 		self.gene_lists = self.gene_lists + [label]
 		self.gene_dict[label]={'markers':markers,
-							  'positions':positions,
-							  'groups':groups}
+							  'feature_positions':feature_positions,
+							  'feature_groups':feature_groups,
+							  'groupby_positions':groupby_positions}
 
 	def set_filter_params(self, min_cells=0, min_genes=500, max_genes=7000, max_counts=30000, max_mito=0.1):
 		self.__set_param_attr(locals())
@@ -354,6 +355,8 @@ class sca_run:
 
 		self.initial_cell_count = len(adata.obs_names)
 		self.initial_gene_count=len(adata.var_names)
+
+		print(self.initial_cell_count)
 		## Basic filtering to get rid of useless cells and unexpressed genes
 		sc.pp.filter_genes(adata, min_cells=param_dict['min_cells'])
 		sc.pp.filter_cells(adata, min_genes=param_dict['min_genes'])
@@ -551,12 +554,9 @@ class sca_run:
 				sc.pl.umap(adata, color=genes_to_plot, save= ''.join(['_featureplots_',gene_list,file_type]), show=False, 
 						   cmap=my_feature_cmap, size=size, use_raw=True)
 		
-				if gene_dict['positions'] and gene_dict['groups']:
-					group_positions = gene_dict['positions'] # Manually set and determined
-					group_labels = gene_dict['groups']
-				else:
-					group_positions = None
-					group_labels = None
+				feature_positions = gene_dict['feature_positions'] # Manually set and determined
+				feature_groups = gene_dict['feature_groups']
+				groupby_positions = gene_dict['groupby_positions']
 
 				if len(gene_dict['markers'])!=1:
 					for grouping in self.exp_grouping:
@@ -564,17 +564,18 @@ class sca_run:
 						# Circle color corresponds to expression level, and circle size corresponds to percentage of cells expressing gene
 
 						## Reordering categories for dotplot or heatmap rows
-						#adata_temp = adata.copy()
-						#adata_temp.obs['louvain'] = adata.obs['louvain'].cat.reorder_categories(['3','5','0','4','2','1'],inplace = False)
+						adata_plots = adata.copy()
+						if groupby_positions:
+							adata_plots.obs['louvain'] = adata.obs['louvain'].cat.reorder_categories(groupby_positions,inplace = False)
 
-						sc.pl.dotplot(adata, genes_to_plot, groupby=grouping, 
-								var_group_positions=group_positions, var_group_labels=group_labels,
+						sc.pl.dotplot(adata_plots, genes_to_plot, groupby=grouping, 
+								var_group_positions=feature_positions, var_group_labels=feature_groups,
 								save=''.join(['_markers_',gene_list,'_',grouping,file_type]), show=False, 
-								color_map=my_feature_cmap, use_raw=True, dot_max=0.4)
+								color_map=my_feature_cmap, use_raw=True)#, dot_max=0.4)#, dendrogram=True)
 						## Heatmaps
 						# Each horizontal line represents expression of one cell
-						sc.pl.heatmap(adata, genes_to_plot, groupby=grouping, 
-								var_group_positions=group_positions, var_group_labels=group_labels,
+						sc.pl.heatmap(adata_plots, genes_to_plot, groupby=grouping, 
+								var_group_positions=feature_positions, var_group_labels=feature_groups,
 								save=''.join(['_markers_',gene_list,'_',grouping,file_type]), show=False, 
 								cmap=my_feature_cmap, use_raw=True)
 
@@ -659,6 +660,8 @@ class sca_run:
 			self.adata_preProcessed = run_save.adata_preProcessed
 			self.adata_preFiltered = run_save.adata_preFiltered
 			self.annotation_dict = run_save.annotation_dict
+			self.initial_cell_count = run_save.initial_cell_count
+			self.initial_gene_count= run_save.initial_gene_count
 		else:
 			adata = self.load_data()
 
@@ -712,6 +715,8 @@ class sca_run:
 			self.adata_preProcessed = run_save.adata_preProcessed
 			self.adata_preFiltered = run_save.adata_preFiltered
 			self.annotation_dict = run_save.annotation_dict
+			self.initial_cell_count = run_save.initial_cell_count
+			self.initial_gene_count= run_save.initial_gene_count
 
 			## Create an unprocessed AnnData object with the desired clusters
 			adata_ext = self.adata_preProcessed[adata.obs['louvain'].isin(extracted)].copy()
@@ -740,7 +745,7 @@ class sca_run:
 			pickle.dump(self,open(''.join([figdir,'extracted/',label,'/',new_save]),"wb"),protocol=4)
 
 		## Write a summary of the analysis to a text file including sample information and parameters
-		self.write_summary(figdir=figdir)
+		self.write_summary(figdir=''.join([figdir,'extracted/',label,'/']))
 
 		print("\nAll done!\n")
 
