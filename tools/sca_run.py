@@ -48,13 +48,15 @@ class sca_run:
 		self.resolution = 0.6
 		self.remove_batch_effects = False
 		self.do_tSNE = False
+		self.cell_score_lists = []
 
 		## Plot Params
 		self.size = 20
 		self.umap_obs = ['louvain','sampleName']
 		self.exp_grouping = ['louvain']
 		self.final_quality = False
-		self.umap_color = 'yellow_blue'
+		self.umap_categorical_color = 'default'
+		self.umap_feature_color = 'yellow_blue'
 
 		## Summary Params
 		self.initial_cell_count = None
@@ -68,22 +70,27 @@ class sca_run:
 		self.adata_preFiltered = None
 		self.adata_preProcessed = None
 
-	def add_gene_list(self, markers=[], label='basic_list', feature_positions=None, feature_groups=None, groupby_positions=None):
+	## Function to set a list of genes and save relevant information in a dictionary of gene lists
+	def add_gene_list(self, markers=['EPCAM','CDH5','VIM','TP63'], label='basic_list', feature_positions=None, feature_groups=None, groupby_positions=None):
 		self.gene_lists = self.gene_lists + [label]
 		self.gene_dict[label]={'markers':markers,
 							  'feature_positions':feature_positions,
 							  'feature_groups':feature_groups,
 							  'groupby_positions':groupby_positions}
 
+	## Function to set multiple filtering parameters in attributes
 	def set_filter_params(self, min_cells=0, min_genes=500, max_genes=7000, max_counts=30000, max_mito=0.1):
 		self.__set_param_attr(locals())
 
-	def set_analysis_params(self, n_neighbors=30, n_pcs=15, spread=1, min_dist=0.4, resolution=0.6, remove_batch_effects=False):
+	## Function to set multiple analysis parameters in attributes
+	def set_analysis_params(self, n_neighbors=30, n_pcs=15, spread=1, min_dist=0.4, resolution=0.6, remove_batch_effects=False, do_tSNE=False, cell_score_lists=[]):
 		self.__set_param_attr(locals())
 
-	def set_plot_params(self, size=20, umap_obs=['louvain','sampleName'], exp_grouping=['louvain'], umap_color='yellow_blue', final_quality=False):
+	## Function to set multiple plot parameters in attributes
+	def set_plot_params(self, size=20, umap_obs=['louvain','sampleName'], exp_grouping=['louvain'], umap_categorical_color='default', umap_feature_color='yellow_blue', final_quality=False):
 		self.__set_param_attr(locals())
 
+	## Function that checks if an argument exists in a function and sets instance attributes based on them
 	def __set_param_attr(self,arg_dict):
 		for key in arg_dict:
 			if key != 'self':
@@ -191,6 +198,7 @@ class sca_run:
 				wr.writerow(self.__ele_swap(list(rank_genes_data.keys()),0,1))
 				wr.writerows(zip(*self.__ele_swap([params[cluster] for params in rank_genes_data.values()],0,1)))
 
+	## Count number of cells in each louvain cluster as well as the sample splits within each cluster
 	def __cell_counter(self,adata):
 		#print(adata.obs['louvain'])
 		self.sample_counts = {}
@@ -338,25 +346,27 @@ class sca_run:
 			adata.obs_names_make_unique()
 			
 			## Write the raw combined dataset to disk so you can skip combining samples next time
-			print('\nSaving raw combined sample data to', raw_data_file,'\n')
-			adata.write(raw_data_file)
+			try:
+				print('\nSaving raw combined sample data to', raw_data_file,'\n')
+				adata.write(raw_data_file)
+			except:
+				print('\nUnable to save raw combined sample data to', raw_data_file,'\n')
 
 		return adata
 
 	## Filters data based on certain parameters
 	# Attempts to remove "bad" data such as dead cells, doublets, etc.
-	def filter_data(self, adata, min_cells=None, min_genes=None, max_counts=None, max_genes=None, max_mito=None):
+	def filter_data(self, adata, min_cells=None, min_genes=None, max_counts=None, max_genes=None, max_mito=None,
+					remove_batch_effects=None):
 		'''
 		Removes cells expressing low to no genes, and genes expressed in few to no cells
 		Filters out cells based on mitochondrial genes, UMI and max gene expression
 		'''
 		# If argument is None, set to instance attribute
 		param_dict = {k:(v if v else getattr(self,k)) for (k,v) in locals().items()}
-
 		self.initial_cell_count = len(adata.obs_names)
-		self.initial_gene_count=len(adata.var_names)
+		self.initial_gene_count = len(adata.var_names)
 
-		print(self.initial_cell_count)
 		## Basic filtering to get rid of useless cells and unexpressed genes
 		sc.pp.filter_genes(adata, min_cells=param_dict['min_cells'])
 		sc.pp.filter_cells(adata, min_genes=param_dict['min_genes'])
@@ -376,6 +386,14 @@ class sca_run:
 					& (adata.obs['percent_mito'] < param_dict['max_mito'])), :]   # Keep cells with less than __ mito/genomic gene ratio
 
 		return adata
+
+	## Separates an adata object into a list of adata objects split using an obs field
+	def __separate_adata(self,adata,obs_field):
+		adata_list = []
+		for meta_value in adata.obs[obs_field].unique():
+			adata_list.append(adata[(adata.obs[obs_field] == meta_value),:].copy())
+
+		return adata_list
 
 	## Standardize and normalize the data set
 	# Includes additional processing such as removing biased and uninformative data
@@ -407,6 +425,7 @@ class sca_run:
 
 		## Scale each gene to unit variance. Clip values exceeding standard deviation 10 to remove extreme outliers
 		sc.pp.scale(adata, max_value=10)
+
 		return adata
 
 	## Run dimensional reduction analysis and clustering using KNN graph
@@ -414,6 +433,15 @@ class sca_run:
 					 min_dist=None, resolution=None, remove_batch_effects=None, do_tSNE=None):
 		# If argument is None, set to instance attribute
 		param_dict = {k:(v if v else getattr(self,k)) for (k,v) in locals().items()}
+
+		## Find cell type score for each cell based on a predefined set of gene lists
+		if self.cell_score_lists:
+			for file in self.cell_score_lists:
+				score_list = [line.rstrip('\n') for line in open(''.join([file,'.txt']),'r')]
+				print(score_list)
+
+				sc.tl.score_genes(adata, score_list, ctrl_size=25, gene_pool=None, n_bins=25, score_name=file, random_state=0, copy=False, use_raw=True)
+		#print(adata.score_name())
 
 		## Run PCA to compute the default number of components
 		sc.tl.pca(adata, svd_solver='arpack')
@@ -431,11 +459,11 @@ class sca_run:
 		# Note that doing this may override previous sc.pp.neighbors()
 		if param_dict['remove_batch_effects']:
 			import bbknn
-			bbknn.bbknn(adata, batch_key='sampleName', copy=False)
+			bbknn.bbknn(adata, batch_key='sampleName', copy=False)#, n_pcs=param_dict['n_pcs'], neighbors_within_batch=param_dict['n_neighbors'])
 			#sc.pp.external.mnn_correct(adata,batch_key='sampleName') # Testing another algorithm
 
 		## Run UMAP Dim reduction
-		sc.tl.umap(adata, spread=param_dict['spread'], min_dist=param_dict['min_dist']) # Min_dist needs to be between 0.01 to 0.5
+		sc.tl.umap(adata, spread=param_dict['spread'], min_dist=param_dict['min_dist'], n_components=2) # Min_dist needs to be between 0.01 to 0.5
 
 		## Run tSNE analysis
 		if param_dict['do_tSNE']:
@@ -464,10 +492,10 @@ class sca_run:
 		param_dict = {k:(v if v else getattr(self,k)) for (k,v) in locals().items()}
 
 		## Create my custom palette for FeaturePlots and define a matlplotlib colormap object
-		if self.umap_color=='blue_orange':
+		if self.umap_feature_color=='blue_orange':
 			feature_colors = [(35,35,142), (255,127,0)]
 			my_feature_cmap = self.__make_cmap(feature_colors,bit=True)
-		elif self.umap_color=='yellow_blue':
+		elif self.umap_feature_color=='yellow_blue':
 			feature_colors = [(210,210,210), (210,210,210), (245,245,200), (100,200,225), (0,45,125)]
 			position=[0, 0.019999, 0.02, 0.55, 1]
 			my_feature_cmap = self.__make_cmap(feature_colors,bit=True,position=position)
@@ -478,11 +506,17 @@ class sca_run:
 
 		gray_cmap = self.__make_cmap([(220,220,220),(220,220,220)], bit=True)
 
-		## Custom color palette for cluster plots and observation plots
-		colors = [(0.5,0.85,0.5),(1,0,0),(0,1,0),(0,0,0.9),(1,0,1),(0,1,1),(0.9,0.9,0),
-				(0.3,0.3,0.3),(0.85,0.5,0.5),(0.5,0.5,0.85),
-				(0.15,0.5,0.5),(0.5,0.15,0.5),(0.5,0.5,0.15),
-				(1,0.5,0),(0,0.5,1),(0.5,1,0),(0.5,0,1),(1,0,0.5),(0,1,0.5)]
+
+		## Check to see if user specified a color palette for categorical umap plots, ie. louvain, obs_fields
+		if self.umap_categorical_color=='default':
+			## Custom color palette for cluster plots and observation plots
+			colors = [(1,0.5,0),(0.5,0.5,0.85),(0,1,0),(1,0,0),(0,0,0.9),(0,1,1),
+					(0.4,0.4,0.4),(0.5,0.85,0.5),(0.5,0.15,0.5),
+					(0.15,0.5,0.5),(0.5,0.5,0.15),(0.9,0.9,0),(1,0,1),
+					(0,0.5,1),(0.85,0.5,0.5),(0.5,1,0),(0.5,0,1),(1,0,0.5),(0,0.9,0.6),
+					(0.3,0.6,0),(0,0.3,0.6),(0.6,0.3,0),(0.3,0,0.6),(0,0.6,0.3),(0.6,0,0.3)]
+		else:
+			colors = self.umap_categorical_color
 
 		## General figure parameters and settings
 		sc.set_figure_params(dpi_save=300,dpi=300)#,vector_friendly=False)
@@ -531,7 +565,7 @@ class sca_run:
 		# 		show=False, save=''.join(['_rank_violin_',rank_grouping,file_type]))
 
 		rank_grouping = 'louvain'
-		n_genes_rank = 25
+		n_genes_rank = 5
 		self.__rank_genes(adata,rank_grouping,figdir=figdir)#,clusters2_compare=['1','4'])
 		sc.pl.rank_genes_groups_heatmap(adata, n_genes=n_genes_rank, use_raw=True, show=False, 
 				save=''.join(['_rank_heatmap_',rank_grouping,file_type]), cmap=my_feature_cmap)
@@ -584,17 +618,20 @@ class sca_run:
 		sc.pl.umap(adata, color=missing_genes, save=''.join(['_featureplots_gray',file_type]), 
 				show=False, cmap=gray_cmap, size=size, use_raw=True)
 
+		# tSNE Plots - should move to integrate in umap code
 		if self.do_tSNE:
-			# tSNE Plots
 			sc.pl.tsne(adata, color='louvain', save = '_clusterIdentity.png', show = False, 
-						legend_loc = 'right margin', edges = False, size = 20, 
+						legend_loc = 'right margin', edges = False, size = size, 
 						palette = colors, alpha = 0.75)
 			sc.pl.tsne(adata, color='sampleName', save = '_sample.png', show = False, 
-						legend_loc = 'right margin', edges = False, size = 20, 
+						legend_loc = 'right margin', edges = False, size = size, 
 						palette = colors, alpha = 0.75)
 			sc.pl.tsne(adata, color=genes_to_plot, save = '_featureplots.png', show = False, cmap = my_feature_cmap, size=size, use_raw = True)
 			sc.pl.tsne(adata, color=missing_genes, save='_featureplots_gray.png', show=False, cmap=gray_cmap, size=size, use_raw=True)
 		
+		# Generate a umap feature plot based on 
+		if self.cell_score_lists:
+			sc.pl.umap(adata, color=self.cell_score_lists, save='_cellType_score.png', show=False, edges=False, color_map=my_feature_cmap, size=size)
 
 		# ## Violin plot for comparing gene expression among different groups/clusters
 		# # Create observation field labeled using binary information
@@ -667,6 +704,7 @@ class sca_run:
 
 			## Remove specific genes from the analysis (such as experimentally observed contaminations)
 			if remove_genes:
+				print('Removing specified list of genes from analysis')
 				adata = self.filter_specific_genes(adata,text_file = remove_genes)
 
 			## Filter and process data
