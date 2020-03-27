@@ -32,7 +32,7 @@ an_run.add_gene_list(markers= ['CDH5','KDR','FLT1','NOS3','VWF','EMCN','CDH1','K
 					 label='basic_list')
 
 ## Parameters used to filter the data - Mainly used to get rid of bad cells
-an_run.set_filter_params(min_cells = 0, # Filter out cells 
+an_run.set_filter_params(min_cells = 0, # Filter out genes with a few number of cells
 						 min_genes = 500, # Filter out cells with fewer genes to remove dead cells
 						 max_genes = 7000, # Filter out cells with more genes to remove most doublets
 						 max_counts = 30000, # Filter out cells with more UMIs to catch a few remaining doublets
