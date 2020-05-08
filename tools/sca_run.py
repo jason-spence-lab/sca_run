@@ -1,7 +1,7 @@
 '''
 Applications of single cell data analysis techniques
 Written by Josh Wu and Mike Czerwinski
-8 September, 2019
+8 May, 2020
 
 Relies heavily on the Scanpy Python module developed by the Theis Lab
 Read more about Scanpy at https://scanpy.readthedocs.io/en/latest/index.html
@@ -18,11 +18,13 @@ import copy
 import os
 import json
 from matplotlib import rcParams
+from matplotlib import pyplot as plt
 import matplotlib as mpl
 import matplotlib.pyplot as plt
 import random
 import math
 import _pickle as pickle
+import DoubletDetection as doubletdetection
 
 class sca_run:
 	sc.settings.verbosity = 3
@@ -72,6 +74,7 @@ class sca_run:
 		## adata
 		self.adata = None
 		self.adata_preFiltered = None
+		self.adata_unscaled = None
 		self.adata_postFiltered = None
 
 
@@ -283,7 +286,7 @@ class sca_run:
 
 			f.write('\n--------Sample Cell Counts Used--------\n')
 			f.write(json.dumps(str(self.sample_counts)))
-			f.write('\n--------Sample Cell Counts Used--------\n')
+			f.write('\n--------Louvain Cell Counts Used--------\n')
 			f.write(json.dumps(str(self.louvain_counts)))
 
 			if self.cell_score_lists:
@@ -324,7 +327,7 @@ class sca_run:
 
 		## Splits given gene list into two based on whether or not they exist or are invariable
 		for gene in gene_list:
-			gene_zero = (gene in adata.raw.var_names) and np.any(adata.raw[:,gene].X)
+			gene_zero = (gene in adata.raw.var_names) and np.any(adata.raw[:,gene].X.toarray())
 			(genes_exist if gene_zero else missing_genes).append(gene)
 
 		missing_genes = list(set(missing_genes))
@@ -399,6 +402,11 @@ class sca_run:
 		self.initial_cell_count = len(adata.obs_names)
 		self.initial_gene_count = len(adata.var_names)
 
+		# clf = doubletdetection.BoostClassifier()
+		# print(type(adata.X))
+		# labels = clf.fit(adata.X.toarray()).predict()
+		# print(labels)
+
 		## Basic filtering to get rid of useless cells and unexpressed genes
 		sc.pp.filter_genes(adata, min_cells=param_dict['min_cells'])
 		sc.pp.filter_cells(adata, min_genes=param_dict['min_genes'])
@@ -406,17 +414,24 @@ class sca_run:
 		# Calculate the percent of genes derived from mito vs genome
 		# the `.A1` is only necessary as X is sparse (to transform to a dense array after summing)
 		mito_genes = adata.var_names.str.startswith('MT-')
-		adata.obs['percent_mito'] = np.sum(adata[:, mito_genes].X, axis=1).A1 / np.sum(adata.X, axis=1).A1
+		try:
+			adata.obs['percent_mito'] = np.sum(adata[:,mito_genes].X, axis=1).A1 / np.sum(adata.X, axis=1).A1
 
-		# add the total counts per cell as observations-annotation to adata
-		adata.obs['n_counts'] = adata.X.sum(axis=1).A1
+			# add the total counts per cell as observations-annotation to adata
+			adata.obs['n_counts'] = adata.X.sum(axis=1).A1
+		except:
+			adata.obs['percent_mito'] = np.sum(adata[:,mito_genes].X, axis=1) / np.sum(adata.X, axis=1)
+
+			# add the total counts per cell as observations-annotation to adata
+			adata.obs['n_counts'] = adata.X.sum(axis=1)
+
 
 		self.adata_preFiltered = adata.copy() # Saving pre-Filtered AnnData
 
 		## Actually do the filtering.
 		adata = adata[((adata.obs['n_genes'] < param_dict['max_genes'])   # Keep cells with less than __ genes to remove most doublets
 					& (adata.obs['n_counts'] < param_dict['max_counts'])   # Keep cells with less than __ UMIs to catch a few remaining doublets
-					& (adata.obs['percent_mito'] < param_dict['max_mito'])), :]   # Keep cells with less than __ mito/genomic gene ratio
+					& (adata.obs['percent_mito'] < param_dict['max_mito']))]   # Keep cells with less than __ mito/genomic gene ratio
 
 		return adata
 
@@ -473,6 +488,8 @@ class sca_run:
 
 		## Regress out effects of total reads per cell and the percentage of mitochondrial genes expressed.
 		sc.pp.regress_out(adata, ['n_counts','percent_mito'])
+
+		self.adata_unscaled = adata.copy()
 
 		print('\nDoing, final filtering...\nKeeping', len(adata.obs_names),'cells and', len(adata.var_names),'genes.\n')
 
@@ -580,18 +597,18 @@ class sca_run:
 
 		# Check to see if user wants publication quality figures
 		if param_dict['final_quality']:
-			rcParams['figure.figsize'] = 4, 4
+			# rcParams['figure.figsize'] = 4, 4
 			rcParams['savefig.dpi']=1200
 			file_type = '.pdf'
 		else:
 			file_type = '.png'
 
 		## Violin plots for filtering parameters pre and post
-		print(self.adata_preFiltered)
 		sc.pl.violin(adata, ['n_genes','n_counts','percent_mito'],
 					 jitter=0.4, multi_panel=True, save='_postFiltered_plot.png', show=False)
-		sc.pl.violin(self.adata_preFiltered, ['n_genes','n_counts','percent_mito'],
-		 			 jitter=0.4, multi_panel=True, save='_preFiltered_plot.png', show=False)
+		if self.adata_preFiltered:
+			sc.pl.violin(self.adata_preFiltered, ['n_genes','n_counts','percent_mito'],
+		 			 	jitter=0.4, multi_panel=True, save='_preFiltered_plot.png', show=False)
 
 		## Draw the PCA elbow plot to determine which PCs to use
 		sc.pl.pca_variance_ratio(adata, log=True, n_pcs=100, save='_elbowPlot.png', show=False)
@@ -648,30 +665,36 @@ class sca_run:
 				feature_groups = gene_dict['feature_groups']
 				groupby_positions = gene_dict['groupby_positions']
 
-				if len(gene_dict['markers'])!=1:
+				if len(gene_dict['markers'])!=0:
 					for grouping in self.exp_grouping:
 						## Dotplot analysis
 						# Circle color corresponds to expression level, and circle size corresponds to percentage of cells expressing gene
 
 						## Reordering categories for dotplot or heatmap rows
 						adata_plots = adata.copy()
+						dendrogram=False
 						if groupby_positions:
+							dendrogram = False
 							adata_plots.obs['louvain'] = adata.obs['louvain'].cat.reorder_categories(groupby_positions,inplace = False)
 
 						sc.pl.dotplot(adata_plots, genes_to_plot, groupby=grouping, 
 								var_group_positions=feature_positions, var_group_labels=feature_groups,
 								save=''.join(['_markers_',gene_list,'_',grouping,file_type]), show=False, 
-								color_map=my_feature_cmap, use_raw=True)#, dot_max=0.4)#, dendrogram=True)
-						# ## Heatmaps
-						# # Each horizontal line represents expression of one cell
-						# sc.pl.heatmap(adata_plots, genes_to_plot, groupby=grouping, 
-						# 		var_group_positions=feature_positions, var_group_labels=feature_groups,
-						# 		save=''.join(['_markers_',gene_list,'_',grouping,file_type]), show=False, 
-						# 		cmap=my_feature_cmap, use_raw=True)
+								color_map=my_feature_cmap, use_raw=True, dendrogram=dendrogram)#, figsize=(4,6))#, dot_max=0.4)#, dendrogram=True)
+						## Heatmaps
+						# Each horizontal line represents expression of one cell
+						sc.pl.heatmap(adata_plots, genes_to_plot, groupby=grouping, 
+								var_group_positions=feature_positions, var_group_labels=feature_groups,
+								save=''.join(['_markers_',gene_list,'_',grouping,file_type]), show=False, 
+								cmap=my_feature_cmap, use_raw=True)
 
 		# Genes that are not expressed or are invariable are plotted using a grayscale
 		print('Plotting empty genes: ',missing_genes,'\n')
-		sc.pl.umap(adata, color=missing_genes, save=''.join(['_featureplots_gray',file_type]), 
+		empty_genes = [gene for gene in missing_genes if (gene in adata.raw.var_names)]
+		genes_noseq = [gene for gene in missing_genes if (gene not in empty_genes)]
+		print('Zero genes: ', empty_genes, '\n')
+		print('Gene not in dataset: ', genes_noseq, '\n')
+		sc.pl.umap(adata, color=empty_genes, save=''.join(['_featureplots_gray',file_type]), 
 				show=False, cmap=gray_cmap, size=size, use_raw=True)
 
 		# tSNE Plots - should move to integrate in umap code
@@ -755,7 +778,7 @@ class sca_run:
 		return adata
 
 	## Most basic pipeline - Input data and output all figures
-	def pipe_basic(self,figdir='./figures/', load_save=None, new_save='adata_save.p', remove_genes=None, final_quality=False):
+	def pipe_basic(self,figdir='./figures/', adata_filtered=None, adata_loaded=None, load_save=None, new_save='adata_save.p', remove_genes=None, final_quality=False):
 		'''
 		sca_dict is a dictionary of miscellaneous analysis information including
 		parameters, sample list and gene_lists
@@ -770,23 +793,30 @@ class sca_run:
 			self.vmin_list = run_save.vmin_list
 			self.vmax_list = run_save.vmax_list
 			self.adata_preFiltered = run_save.adata_preFiltered
+			self.adata_unscaled = run_save.adata_unscaled
 			self.adata_postFiltered = run_save.adata_postFiltered
 			self.annotation_dict = run_save.annotation_dict
 			self.initial_cell_count = run_save.initial_cell_count
 			self.initial_gene_count= run_save.initial_gene_count
 		else:
-			adata = self.load_data()
-
+			if not adata_filtered:
+				if adata_loaded:
+					adata = adata_loaded.copy()
+				else:
+					adata = self.load_data()
+				## Filter and process data
+				adata = self.filter_data(adata)
+			else: 
+				adata = adata_filtered.copy()
 			## Remove specific genes from the analysis (such as experimentally observed contaminations)
 			if remove_genes:
 				print('Removing specified list of genes from analysis')
 				adata = self.filter_specific_genes(adata,text_file = remove_genes)
 
-			## Filter and process data
-			adata = self.filter_data(adata)
 			#pickle.dump(adata,open('./fetad_forest_script/data/adata_all.p',"wb"),protocol=4)
 			self.adata_postFiltered = adata.copy() # Save for later in case of necessary extraction
 			adata = self.preprocess_data(adata)
+			print(adata)
 
 		## Dimensional reduction and clustering - construction of the neighborhood graph
 		adata = self.run_analysis(adata)
@@ -830,6 +860,7 @@ class sca_run:
 			self.vmin_list = run_save.vmin_list
 			self.vmax_list = run_save.vmax_list
 			self.adata_preFiltered = run_save.adata_preFiltered
+			self.adata_unscaled = run_save.adata_unscaled
 			self.adata_postFiltered = run_save.adata_postFiltered
 			self.annotation_dict = run_save.annotation_dict
 			self.initial_cell_count = run_save.initial_cell_count
