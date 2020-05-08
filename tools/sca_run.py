@@ -1,7 +1,7 @@
 '''
 Applications of single cell data analysis techniques
 Written by Josh Wu and Mike Czerwinski
-8 September, 2019
+8 May, 2020
 
 Relies heavily on the Scanpy Python module developed by the Theis Lab
 Read more about Scanpy at https://scanpy.readthedocs.io/en/latest/index.html
@@ -18,11 +18,13 @@ import copy
 import os
 import json
 from matplotlib import rcParams
+from matplotlib import pyplot as plt
 import matplotlib as mpl
 import matplotlib.pyplot as plt
 import random
 import math
 import _pickle as pickle
+import DoubletDetection as doubletdetection
 
 class sca_run:
 	sc.settings.verbosity = 3
@@ -57,6 +59,10 @@ class sca_run:
 		self.final_quality = False
 		self.umap_categorical_color = 'default'
 		self.umap_feature_color = 'yellow_blue'
+		self.vmin_list = []
+		self.vmax_list = []
+		self.rank_grouping = ['louvain']
+		self.clusters2_compare = ['all']
 
 		## Summary Params
 		self.initial_cell_count = None
@@ -68,7 +74,9 @@ class sca_run:
 		## adata
 		self.adata = None
 		self.adata_preFiltered = None
-		self.adata_preProcessed = None
+		self.adata_unscaled = None
+		self.adata_postFiltered = None
+
 
 	## Function to set a list of genes and save relevant information in a dictionary of gene lists
 	def add_gene_list(self, markers=['EPCAM','CDH5','VIM','TP63'], label='basic_list', feature_positions=None, feature_groups=None, groupby_positions=None):
@@ -87,7 +95,9 @@ class sca_run:
 		self.__set_param_attr(locals())
 
 	## Function to set multiple plot parameters in attributes
-	def set_plot_params(self, size=20, umap_obs=['louvain','sampleName'], exp_grouping=['louvain'], umap_categorical_color='default', umap_feature_color='yellow_blue', final_quality=False):
+	def set_plot_params(self, size=20, umap_obs=['louvain','sampleName'], exp_grouping=['louvain'], umap_categorical_color='default', 
+						umap_feature_color='yellow_blue', final_quality=False,vmin_list=[],vmax_list=[],rank_grouping=['louvain'],
+						clusters2_compare = ['all']):
 		self.__set_param_attr(locals())
 
 	## Function that checks if an argument exists in a function and sets instance attributes based on them
@@ -178,20 +188,23 @@ class sca_run:
 		elif clusters2_compare == None: # Do default 1vAll comparison
 			print("No clusters selected for comparison. Doing default 1vAll comparison")
 			sc.tl.rank_genes_groups(adata,groupby ,method='t-test', rankby_abs=False, n_genes=200)
-			self.__write_rank_genes(adata, groupby, figdir)
+			self.__write_rank_genes(adata, groupby, clusters2_compare, figdir)
 		else: # Compare 
-			adata_temp = adata[adata.obs[groupby].isin(clusters2_compare)]
+			adata_temp = adata[adata.obs['louvain'].isin(clusters2_compare)]
 			sc.tl.rank_genes_groups(adata_temp, groupby, method='t-test', n_genes=200)
-			self.__write_rank_genes(adata_temp, groupby, figdir)
+			self.__write_rank_genes(adata_temp, groupby, clusters2_compare, figdir)
 		return 0
 
 	## Actually does the writing to csv files of the rank genes analysis
-	def __write_rank_genes(self,adata, groupby, figdir='./figures/'):
+	def __write_rank_genes(self,adata, groupby, clusters2_compare, figdir='./figures/'):
 		rank_genes_data = copy.deepcopy(adata.uns['rank_genes_groups']) # create copy of data to manipulate
 		rank_genes_data.pop('params')
+		if clusters2_compare == None:
+			clusters2_compare=['all']
 
 		for cluster in adata.obs[groupby].cat.categories:
-			csv_fileName = ''.join([figdir,'/csv_files/',cluster,'_',groupby,'_clustercompare.csv'])
+			csv_fileName = '/'.join([figdir,'csv_files','_'.join([groupby]+clusters2_compare),
+				'_'.join([cluster,'compare.csv'])])
 			os.makedirs(os.path.dirname(csv_fileName), exist_ok=True) # Make file if it doesn't exist already
 			with open(csv_fileName,'w',newline='') as f:
 				wr = csv.writer(f)
@@ -222,10 +235,20 @@ class sca_run:
 
 		return 0
 
+	## If doing cell scoring analysis, get average score per cluster given a gene scoring list name
+	def __count_cluster_scores(self, adata, cell_score_list):
+		cluster_scores = {}
+		for cluster in adata.obs['louvain'].cat.categories:
+			cluster_scores[cluster] = adata[adata.obs['louvain'].isin([cluster])].obs[cell_score_list].mean()
+
+		return cluster_scores
+
 	## Write a summary of the analysis run including sample information, parameters and filtering information
 	# Not completely up to date
 	def write_summary(self, figdir='./figures/'):
 		self.__cell_counter(self.adata)
+		self.final_cell_count = len(self.adata.obs_names)
+		self.final_gene_count=len(self.adata.var_names)
 
 		fileName = ''.join([figdir,'summary.txt'])
 
@@ -263,9 +286,19 @@ class sca_run:
 
 			f.write('\n--------Sample Cell Counts Used--------\n')
 			f.write(json.dumps(str(self.sample_counts)))
-			f.write('\n--------Sample Cell Counts Used--------\n')
+			f.write('\n--------Louvain Cell Counts Used--------\n')
 			f.write(json.dumps(str(self.louvain_counts)))
 
+			if self.cell_score_lists:
+				f.write('\n--------Cluster Scores--------\n')
+				for cell_score_list in self.cell_score_lists:
+					# f.write(''.join(['--------',cell_score_list,'_raw--------\n']))
+					# f.write(json.dumps(str(self.__count_cluster_scores(self.adata, ''.join([cell_score_list,'_raw'])))))
+					f.write(''.join(['--------',cell_score_list,'--------\n']))
+					f.write(json.dumps(str(self.__count_cluster_scores(self.adata, cell_score_list))))
+					f.write('\n')
+					# f.write(''.join(['\n--------',cell_score_list,'_processed--------\n']))
+					# f.write(json.dumps(str(self.__count_cluster_scores(self.adata, ''.join([cell_score_list,'_processed'])))))
 		return 0
 
 	## Remove a specified list of genes from AnnData object
@@ -294,7 +327,7 @@ class sca_run:
 
 		## Splits given gene list into two based on whether or not they exist or are invariable
 		for gene in gene_list:
-			gene_zero = (gene in adata.raw.var_names) and np.any(adata.raw[:,gene].X)
+			gene_zero = (gene in adata.raw.var_names) and np.any(adata.raw[:,gene].X.toarray())
 			(genes_exist if gene_zero else missing_genes).append(gene)
 
 		missing_genes = list(set(missing_genes))
@@ -303,7 +336,7 @@ class sca_run:
 
 		return [genes_exist, missing_genes]
 
-	## Loads data from storage point and creates an AnnData object
+	## Loads data from storage point and creates an AnnData object 
 	# Adds metadata to adata object 
 	def load_data(self, storage_mount_point=None, sample_list=None):
 		'''
@@ -352,6 +385,8 @@ class sca_run:
 			except:
 				print('\nUnable to save raw combined sample data to', raw_data_file,'\n')
 
+		#print(adata.var['genome'].values)
+
 		return adata
 
 	## Filters data based on certain parameters
@@ -367,6 +402,11 @@ class sca_run:
 		self.initial_cell_count = len(adata.obs_names)
 		self.initial_gene_count = len(adata.var_names)
 
+		# clf = doubletdetection.BoostClassifier()
+		# print(type(adata.X))
+		# labels = clf.fit(adata.X.toarray()).predict()
+		# print(labels)
+
 		## Basic filtering to get rid of useless cells and unexpressed genes
 		sc.pp.filter_genes(adata, min_cells=param_dict['min_cells'])
 		sc.pp.filter_cells(adata, min_genes=param_dict['min_genes'])
@@ -374,16 +414,24 @@ class sca_run:
 		# Calculate the percent of genes derived from mito vs genome
 		# the `.A1` is only necessary as X is sparse (to transform to a dense array after summing)
 		mito_genes = adata.var_names.str.startswith('MT-')
-		adata.obs['percent_mito'] = np.sum(adata[:, mito_genes].X, axis=1).A1 / np.sum(adata.X, axis=1).A1
+		try:
+			adata.obs['percent_mito'] = np.sum(adata[:,mito_genes].X, axis=1).A1 / np.sum(adata.X, axis=1).A1
 
-		# add the total counts per cell as observations-annotation to adata
-		adata.obs['n_counts'] = adata.X.sum(axis=1).A1
+			# add the total counts per cell as observations-annotation to adata
+			adata.obs['n_counts'] = adata.X.sum(axis=1).A1
+		except:
+			adata.obs['percent_mito'] = np.sum(adata[:,mito_genes].X, axis=1) / np.sum(adata.X, axis=1)
+
+			# add the total counts per cell as observations-annotation to adata
+			adata.obs['n_counts'] = adata.X.sum(axis=1)
+
 
 		self.adata_preFiltered = adata.copy() # Saving pre-Filtered AnnData
+
 		## Actually do the filtering.
 		adata = adata[((adata.obs['n_genes'] < param_dict['max_genes'])   # Keep cells with less than __ genes to remove most doublets
 					& (adata.obs['n_counts'] < param_dict['max_counts'])   # Keep cells with less than __ UMIs to catch a few remaining doublets
-					& (adata.obs['percent_mito'] < param_dict['max_mito'])), :]   # Keep cells with less than __ mito/genomic gene ratio
+					& (adata.obs['percent_mito'] < param_dict['max_mito']))]   # Keep cells with less than __ mito/genomic gene ratio
 
 		return adata
 
@@ -398,7 +446,7 @@ class sca_run:
 	## Standardize and normalize the data set
 	# Includes additional processing such as removing biased and uninformative data
 	def preprocess_data(self,adata):
-		## Normalize the expression matrix to 10,000 reads per cell, so that counts become comparable among cells.
+		## Normalize the expression matrix to median reads per cell, so that counts become comparable among cells.
 		# This corrects for differences in sequencing depth between cells and samples
 		sc.pp.normalize_total(adata)
 
@@ -409,23 +457,44 @@ class sca_run:
 		# We need to do this because the expression matrix will be rescaled and centered which flattens expression too much for some purposes
 		adata.raw = adata
 
+		## Find cell type score for each cell based on a predefined set of gene lists
+		if self.cell_score_lists:
+			# adata_score_temp = adata.copy()
+			#sc.pp.regress_out(adata_score_temp,['n_counts','percent_mito'])
+			adata_scaled = sc.pp.scale(adata, max_value=10, copy=True)
+			for file in self.cell_score_lists:
+				score_list = [line.rstrip('\n') for line in open(''.join([file,'.txt']),'r')]
+
+				adata.obs[file] = adata_scaled.X[:,adata_scaled.var_names.isin(score_list)].mean(1)
+
+				# sc.tl.score_genes(adata, score_list, ctrl_size=50, gene_pool=None, n_bins=25, score_name=file+'_raw_scaled', random_state=0, copy=False, use_raw=True)
+				#adata.obs[file+'_raw_scaled']=copy.deepcopy(adata_score_temp.obs[file+'_raw_scaled'])
+
+			# adata.X = copy.deepcopy(adata.raw.X)
+
+		print(adata)
 		## Identify highly-variable genes based on dispersion relative to expression level.
 		sc.pp.highly_variable_genes(adata, min_mean=0.0125, max_mean=3, min_disp=0.5)
+
+		# if self.cell_score_lists:
+		# 	for file in self.cell_score_lists:
+		# 		read_score_list = [line.rstrip('\n') for line in open(''.join([file,'.txt']),'r')]
+		# 		[score_list, missing_list] = self.__find_genes(adata,read_score_list)
+		# 		print('\nMissing genes from gene scoring', missing_list, '\n')
+		# 		adata.var['highly_variable'][score_list] = True
 
 		## Filter the genes to remove non-variable genes since they are uninformative
 		adata = adata[:, adata.var['highly_variable']].copy()
 
 		## Regress out effects of total reads per cell and the percentage of mitochondrial genes expressed.
-		#sc.pp.filter_genes(adata, min_counts=1) # 0 columns negatively affect the convergence of regresion
 		sc.pp.regress_out(adata, ['n_counts','percent_mito'])
+
+		self.adata_unscaled = adata.copy()
 
 		print('\nDoing, final filtering...\nKeeping', len(adata.obs_names),'cells and', len(adata.var_names),'genes.\n')
 
-		#sc.pp.filter_cells(adata, min_genes=1) # Remove 0 columns that may have occured in sectioning of data after preprocessing
-
 		## Scale each gene to unit variance. Clip values exceeding standard deviation 10 to remove extreme outliers
 		sc.pp.scale(adata, max_value=10)
-
 		return adata
 
 	## Run dimensional reduction analysis and clustering using KNN graph
@@ -434,23 +503,27 @@ class sca_run:
 		# If argument is None, set to instance attribute
 		param_dict = {k:(v if v else getattr(self,k)) for (k,v) in locals().items()}
 
-		## Find cell type score for each cell based on a predefined set of gene lists
-		if self.cell_score_lists:
-			for file in self.cell_score_lists:
-				score_list = [line.rstrip('\n') for line in open(''.join([file,'.txt']),'r')]
-				print(score_list)
+		# ## Find cell type score for each cell based on a predefined set of gene lists
+		# if self.cell_score_lists:
+		# 	for file in self.cell_score_lists:
+		# 		score_list = [line.rstrip('\n') for line in open(''.join([file,'.txt']),'r')]
+		# 		#print(adata)
 
-				sc.tl.score_genes(adata, score_list, ctrl_size=25, gene_pool=None, n_bins=25, score_name=file, random_state=0, copy=False, use_raw=True)
-		#print(adata.score_name())
+		# 		temp_score_genes1 = copy.deepcopy(adata.obs[file+'_processed'])
+		# 		temp_score_genes2 = copy.deepcopy(adata.obs[file+'_raw'])
+
+		# 		sc.tl.score_genes(adata, score_list, ctrl_size=200, gene_pool=None, n_bins=40, score_name=file+'_processed', random_state=0, copy=False, use_raw=False)
+		# 		print('processed')
+		# 		print(adata.obs[file+'_processed'] - temp_score_genes1)
+		# 		sc.tl.score_genes(adata, score_list, ctrl_size=200, gene_pool=None, n_bins=40, score_name=file+'_raw', random_state=0, copy=False, use_raw=True)
+		# 		print('raw')
+		# 		print(adata.obs[file+'_raw'] - temp_score_genes2)
 
 		## Run PCA to compute the default number of components
 		sc.tl.pca(adata, svd_solver='arpack')
 
 		## Save the existing data to disk for later
 		self.adata_postPCA = adata.copy()
-
-		## Testing of batch correction technique
-		#sc.pp.combat(adata, key='sampleName', covariates={'HT239-ESO-2D':1,'HT239_ESO':0})
 
 		## Compute nearest-neighbors
 		sc.pp.neighbors(adata, n_neighbors=param_dict['n_neighbors'], n_pcs=param_dict['n_pcs'])
@@ -463,7 +536,7 @@ class sca_run:
 			#sc.pp.external.mnn_correct(adata,batch_key='sampleName') # Testing another algorithm
 
 		## Run UMAP Dim reduction
-		sc.tl.umap(adata, spread=param_dict['spread'], min_dist=param_dict['min_dist'], n_components=2) # Min_dist needs to be between 0.01 to 0.5
+		sc.tl.umap(adata, spread=param_dict['spread'], min_dist=param_dict['min_dist'])#, n_components=50) # Min_dist needs to be between 0.01 to 0.5
 
 		## Run tSNE analysis
 		if param_dict['do_tSNE']:
@@ -482,13 +555,11 @@ class sca_run:
 	## Variety of plotting and data display functions
 	# Will make more robust in the future
 	def plot_sca(self, adata, figdir='./figures/', adata_preFiltered=None,
-				annotation_dict=None, adata_postPCA=None, final_quality=None):
+				annotation_dict=None, final_quality=None):
 		'''
 		See the Scanpy visualization library for examples
 		'''
 		print("Plotting")
-		self.final_cell_count = len(adata.obs_names)
-		self.final_gene_count=len(adata.var_names)
 		param_dict = {k:(v if v else getattr(self,k)) for (k,v) in locals().items()}
 
 		## Create my custom palette for FeaturePlots and define a matlplotlib colormap object
@@ -526,24 +597,25 @@ class sca_run:
 
 		# Check to see if user wants publication quality figures
 		if param_dict['final_quality']:
-			rcParams['figure.figsize'] = 4, 4
+			# rcParams['figure.figsize'] = 4, 4
 			rcParams['savefig.dpi']=1200
 			file_type = '.pdf'
 		else:
 			file_type = '.png'
 
 		## Violin plots for filtering parameters pre and post
-		sc.pl.violin(self.adata_preFiltered, ['n_genes','n_counts','percent_mito'],
-		 			 jitter=0.4, multi_panel=True, save='_preFiltered_plot.png', show=False)
 		sc.pl.violin(adata, ['n_genes','n_counts','percent_mito'],
 					 jitter=0.4, multi_panel=True, save='_postFiltered_plot.png', show=False)
+		if self.adata_preFiltered:
+			sc.pl.violin(self.adata_preFiltered, ['n_genes','n_counts','percent_mito'],
+		 			 	jitter=0.4, multi_panel=True, save='_preFiltered_plot.png', show=False)
 
 		## Draw the PCA elbow plot to determine which PCs to use
-		sc.pl.pca_variance_ratio(self.adata_postPCA, log=True, n_pcs=100, save='_elbowPlot.png', show=False)
+		sc.pl.pca_variance_ratio(adata, log=True, n_pcs=100, save='_elbowPlot.png', show=False)
 		## Ranks and displays most contributing genes for each principal component
 		components = 4
 		loadings_components = range(self.n_pcs-components, self.n_pcs+components+1)
-		sc.pl.pca_loadings(self.adata_postPCA, components=loadings_components, save='_rank_genes.png', show=False)
+		sc.pl.pca_loadings(adata, components=loadings_components, save='_rank_genes.png', show=False)
 
 		## Plot results of UMAP dimensional reduction and clustering
 		for observation in self.umap_obs:
@@ -551,28 +623,25 @@ class sca_run:
 			sc.pl.umap(adata, color=observation, save=''.join(['_',observation,file_type]), show=False,
 					   legend_loc=legend, edges=False, size=size, palette=colors, alpha=0.75)
 
+			if self.do_tSNE:
+				sc.pl.tsne(adata, color=observation, save=''.join(['_',observation,file_type]), show=False, 
+							legend_loc=legend, edges=False, size=size, palette=colors, alpha=0.75)
+
 		## Find marker genes via Wilxocon test based on Louvain cluster assignment
 		# Create a simple plot to show the top 25 most significant markers for each cluster
 		# Write most significant markers to a csv file
-		# adata.obs['is_adult'] = ['Adult' if cell=='ND15989_Fresh_WT_Lung_Adult' else 'Fetal' for cell in adata.obs['sampleName']]
-		# rank_grouping = 'age'
-		# rank_genes(adata,rank_grouping,figdir=figdir)#,clusters2_compare=['1','4'])
-		# sc.pl.rank_genes_groups_heatmap(adata, n_genes=100, use_raw=True, show=False, 
-		# 		save=''.join(['_rank_heatmap_',rank_grouping,file_type]), cmap=my_feature_cmap)
-		# sc.pl.rank_genes_groups_dotplot(adata, n_genes=5, use_raw=True, show=False, 
-		# 		save=''.join(['_rank_dotplot_',rank_grouping,file_type]), color_map=my_feature_cmap)
-		# sc.pl.rank_genes_groups_stacked_violin(adata, n_genes=5, use_raw=True, 
-		# 		show=False, save=''.join(['_rank_violin_',rank_grouping,file_type]))
-
-		rank_grouping = 'louvain'
-		n_genes_rank = 5
-		self.__rank_genes(adata,rank_grouping,figdir=figdir)#,clusters2_compare=['1','4'])
-		sc.pl.rank_genes_groups_heatmap(adata, n_genes=n_genes_rank, use_raw=True, show=False, 
-				save=''.join(['_rank_heatmap_',rank_grouping,file_type]), cmap=my_feature_cmap)
-		sc.pl.rank_genes_groups_dotplot(adata, n_genes=n_genes_rank, use_raw=True, show=False, 
-				save=''.join(['_rank_dotplot_',rank_grouping,file_type]), color_map=my_feature_cmap)
-		sc.pl.rank_genes_groups_stacked_violin(adata, n_genes=n_genes_rank, use_raw=True, 
-				show=False, save=''.join(['_rank_violin_',rank_grouping,file_type]))
+		for rank_grouping in self.rank_grouping:		
+			n_genes_rank = 5
+			for comparison in self.clusters2_compare:
+				if comparison == 'all':
+					comparison=None
+				self.__rank_genes(adata,rank_grouping,figdir=figdir,clusters2_compare=comparison)
+			sc.pl.rank_genes_groups_heatmap(adata, n_genes=n_genes_rank, use_raw=True, show=False, 
+					save=''.join(['_rank_heatmap_',rank_grouping,file_type]), cmap=my_feature_cmap)
+			sc.pl.rank_genes_groups_dotplot(adata, n_genes=n_genes_rank, use_raw=True, show=False, 
+					save=''.join(['_rank_dotplot_',rank_grouping,file_type]), color_map=my_feature_cmap)
+			sc.pl.rank_genes_groups_stacked_violin(adata, n_genes=n_genes_rank, use_raw=True, 
+					show=False, save=''.join(['_rank_violin_',rank_grouping,file_type]))
 
 		## Feature plots and dot plot analysis for each specified set of genes
 		#sc.pl.rank_genes_groups(adata, n_genes=25, sharey=False, save='_markerPlots.png', show=False)
@@ -586,26 +655,32 @@ class sca_run:
 				## Do FeaturePlots for select genes
 				print('Plotting standard marker genes: ',genes_to_plot,'\n')
 				sc.pl.umap(adata, color=genes_to_plot, save= ''.join(['_featureplots_',gene_list,file_type]), show=False, 
-						   cmap=my_feature_cmap, size=size, use_raw=True)
+						   cmap=my_feature_cmap, size=size, use_raw=True, vmin=0)
+
+				if self.do_tSNE:
+					sc.pl.tsne(adata, color=genes_to_plot, save= ''.join(['_featureplots_',gene_list,file_type]), show=False, 
+						   cmap=my_feature_cmap, size=size, use_raw=True, vmin=0)
 		
 				feature_positions = gene_dict['feature_positions'] # Manually set and determined
 				feature_groups = gene_dict['feature_groups']
 				groupby_positions = gene_dict['groupby_positions']
 
-				if len(gene_dict['markers'])!=1:
+				if len(gene_dict['markers'])!=0:
 					for grouping in self.exp_grouping:
 						## Dotplot analysis
 						# Circle color corresponds to expression level, and circle size corresponds to percentage of cells expressing gene
 
 						## Reordering categories for dotplot or heatmap rows
 						adata_plots = adata.copy()
+						dendrogram=False
 						if groupby_positions:
+							dendrogram = False
 							adata_plots.obs['louvain'] = adata.obs['louvain'].cat.reorder_categories(groupby_positions,inplace = False)
 
 						sc.pl.dotplot(adata_plots, genes_to_plot, groupby=grouping, 
 								var_group_positions=feature_positions, var_group_labels=feature_groups,
 								save=''.join(['_markers_',gene_list,'_',grouping,file_type]), show=False, 
-								color_map=my_feature_cmap, use_raw=True)#, dot_max=0.4)#, dendrogram=True)
+								color_map=my_feature_cmap, use_raw=True, dendrogram=dendrogram)#, figsize=(4,6))#, dot_max=0.4)#, dendrogram=True)
 						## Heatmaps
 						# Each horizontal line represents expression of one cell
 						sc.pl.heatmap(adata_plots, genes_to_plot, groupby=grouping, 
@@ -615,23 +690,44 @@ class sca_run:
 
 		# Genes that are not expressed or are invariable are plotted using a grayscale
 		print('Plotting empty genes: ',missing_genes,'\n')
-		sc.pl.umap(adata, color=missing_genes, save=''.join(['_featureplots_gray',file_type]), 
+		empty_genes = [gene for gene in missing_genes if (gene in adata.raw.var_names)]
+		genes_noseq = [gene for gene in missing_genes if (gene not in empty_genes)]
+		print('Zero genes: ', empty_genes, '\n')
+		print('Gene not in dataset: ', genes_noseq, '\n')
+		sc.pl.umap(adata, color=empty_genes, save=''.join(['_featureplots_gray',file_type]), 
 				show=False, cmap=gray_cmap, size=size, use_raw=True)
 
 		# tSNE Plots - should move to integrate in umap code
 		if self.do_tSNE:
-			sc.pl.tsne(adata, color='louvain', save = '_clusterIdentity.png', show = False, 
-						legend_loc = 'right margin', edges = False, size = size, 
-						palette = colors, alpha = 0.75)
-			sc.pl.tsne(adata, color='sampleName', save = '_sample.png', show = False, 
-						legend_loc = 'right margin', edges = False, size = size, 
-						palette = colors, alpha = 0.75)
-			sc.pl.tsne(adata, color=genes_to_plot, save = '_featureplots.png', show = False, cmap = my_feature_cmap, size=size, use_raw = True)
-			sc.pl.tsne(adata, color=missing_genes, save='_featureplots_gray.png', show=False, cmap=gray_cmap, size=size, use_raw=True)
+			sc.pl.tsne(adata, color=missing_genes, save=''.join(['_featureplots_gray',file_type]), 
+					show=False, cmap=gray_cmap, size=size, use_raw=True)
 		
-		# Generate a umap feature plot based on 
+		# Generate a umap feature plot based on cell scoring
 		if self.cell_score_lists:
-			sc.pl.umap(adata, color=self.cell_score_lists, save='_cellType_score.png', show=False, edges=False, color_map=my_feature_cmap, size=size)
+			print(self.vmax_list)
+			max_list_len = max([len(self.vmax_list),len(self.vmin_list),len(self.cell_score_lists)])
+			if not self.vmax_list:
+				vmax = [adata.obs.loc[:,self.cell_score_lists].values.max()]*max_list_len
+			else:
+				vmax = self.vmax_list
+
+			if not self.vmin_list:
+				vmin = [adata.obs.loc[:,self.cell_score_lists].values.min()]*max_list_len
+			else:
+				vmin= self.vmin_list
+
+			for i, score_name in enumerate(self.cell_score_lists):
+				sc.pl.umap(adata, color=score_name, 
+						   save=''.join(['_',score_name,'_cellType_score.png']), show=False, edges=False, color_map=my_feature_cmap, 
+						   size=size, vmin=vmin[i], vmax=vmax[i])
+				sc.pl.umap(adata, color=score_name, 
+						   save=''.join(['_',score_name,'_cellType_score_0min.png']), show=False, edges=False, color_map=my_feature_cmap, 
+						   size=size, vmin=0, vmax=vmax[i])
+
+			sc.pl.violin(adata,self.cell_score_lists, 
+						 jitter=0.4, save='_cell_scores.png',show=False,multi_panel=False,rotation=90)
+			# sc.pl.umap(adata, color=[''.join([score_name,'_raw']) for score_name in self.cell_score_lists], save='_cellType_score_raw.png', show=False, edges=False, color_map=my_feature_cmap, size=size, vmin=0)#, vmin=-0.2, vmax=0.7)
+			# sc.pl.umap(adata, color=[''.join([score_name,'_processed']) for score_name in self.cell_score_lists], save='_cellType_score_processed.png', show=False, edges=False, color_map=my_feature_cmap, size=size, vmin=0)#, size=size, vmin=-0.2, vmax=0.7)
 
 		# ## Violin plot for comparing gene expression among different groups/clusters
 		# # Create observation field labeled using binary information
@@ -682,7 +778,7 @@ class sca_run:
 		return adata
 
 	## Most basic pipeline - Input data and output all figures
-	def pipe_basic(self,figdir='./figures/', load_save=None, new_save='adata_save.p', remove_genes=None, final_quality=False):
+	def pipe_basic(self,figdir='./figures/', adata_filtered=None, adata_loaded=None, load_save=None, new_save='adata_save.p', remove_genes=None, final_quality=False):
 		'''
 		sca_dict is a dictionary of miscellaneous analysis information including
 		parameters, sample list and gene_lists
@@ -693,24 +789,34 @@ class sca_run:
 		if load_save: # See if there is already a save file for the analysis to duplicate
 			run_save = pickle.load(open(''.join([figdir,load_save]),"rb"))
 
-			adata = run_save.adata
-			self.adata_preProcessed = run_save.adata_preProcessed
+			adata = run_save.adata.copy()
+			self.vmin_list = run_save.vmin_list
+			self.vmax_list = run_save.vmax_list
 			self.adata_preFiltered = run_save.adata_preFiltered
+			self.adata_unscaled = run_save.adata_unscaled
+			self.adata_postFiltered = run_save.adata_postFiltered
 			self.annotation_dict = run_save.annotation_dict
 			self.initial_cell_count = run_save.initial_cell_count
 			self.initial_gene_count= run_save.initial_gene_count
 		else:
-			adata = self.load_data()
-
+			if not adata_filtered:
+				if adata_loaded:
+					adata = adata_loaded.copy()
+				else:
+					adata = self.load_data()
+				## Filter and process data
+				adata = self.filter_data(adata)
+			else: 
+				adata = adata_filtered.copy()
 			## Remove specific genes from the analysis (such as experimentally observed contaminations)
 			if remove_genes:
 				print('Removing specified list of genes from analysis')
 				adata = self.filter_specific_genes(adata,text_file = remove_genes)
 
-			## Filter and process data
-			adata = self.filter_data(adata)
-			self.adata_preProcessed = adata.copy() # Save for later in case of necessary extraction
+			#pickle.dump(adata,open('./fetad_forest_script/data/adata_all.p',"wb"),protocol=4)
+			self.adata_postFiltered = adata.copy() # Save for later in case of necessary extraction
 			adata = self.preprocess_data(adata)
+			print(adata)
 
 		## Dimensional reduction and clustering - construction of the neighborhood graph
 		adata = self.run_analysis(adata)
@@ -719,20 +825,21 @@ class sca_run:
 		adata = self.plot_sca(adata,figdir=figdir)
 
 		self.adata = adata.copy()
+		## Write a summary of the analysis to a text file including sample information and parameters
+		self.write_summary(figdir=figdir)
+
 		## Save analysis information and relevant AnnData objects to the disk using the Pickle module
 		if new_save:
 			pickle.dump(self,open(''.join([figdir,new_save]),"wb"),protocol=4)
 
-		## Write a summary of the analysis to a text file including sample information and parameters
-		self.write_summary(figdir=figdir)
-
 		print("\nAll done!\n")
 
-		return sca_run
+		return self
 
 	## Pipeline for analysis in which you extract interesting clusters/observations after an initial run
 	# Extracts clusters to an filtered but unprocessed AnnData object, then reprocesses and reclusters
-	def pipe_ext(self, analysis_params_ext, figdir='./figures/', extracted=None, load_save=None, new_save='adata_save.p', final_quality=False, label=''):
+	def pipe_ext(self, analysis_params_ext, figdir='./figures/', extracted=None, load_save=None, new_save='adata_save.p', final_quality=False, label='',
+				 preprocess=True):
 		'''
 		Allows loading of a saved pickle adata file, file must contained adata that has gone through a complete pipeline
 		Otherwise will complete a new full analysis, and then extracts clusters
@@ -747,30 +854,36 @@ class sca_run:
 			if load_save:
 				run_save = pickle.load(open(''.join([figdir,load_save]),"rb"))
 			else: # Otherwise complete a new analysis
-				run_save = self.pipe_basic(sca_run,figdir)
+				run_save = self.pipe_basic(figdir)
 		
-			adata = run_save.adata
-			self.adata_preProcessed = run_save.adata_preProcessed
+			adata = self.adata = run_save.adata
+			self.vmin_list = run_save.vmin_list
+			self.vmax_list = run_save.vmax_list
 			self.adata_preFiltered = run_save.adata_preFiltered
+			self.adata_unscaled = run_save.adata_unscaled
+			self.adata_postFiltered = run_save.adata_postFiltered
 			self.annotation_dict = run_save.annotation_dict
 			self.initial_cell_count = run_save.initial_cell_count
 			self.initial_gene_count= run_save.initial_gene_count
 
-			## Create an unprocessed AnnData object with the desired clusters
-			adata_ext = self.adata_preProcessed[adata.obs['louvain'].isin(extracted)].copy()
-			self.adata_preProcessed = adata_ext.copy()
-			## Reprocess and recluster extracted cells
-			self.preprocess_data(adata_ext)
+			if preprocess:
+				## Create an unprocessed AnnData object with the desired clusters
+				adata_ext = self.adata_postFiltered[adata.obs['louvain'].isin(extracted)].copy()
+				self.adata_postFiltered = adata_ext.copy()
+
+				## Reprocess and recluster extracted cells
+				self.preprocess_data(adata_ext)
+			else:
+				self.adata_postFiltered = self.adata_postFiltered[adata.obs['louvain'].isin(extracted)].copy()
+				adata_ext = self.adata[adata.obs['louvain'].isin(extracted)].copy()
 		else:
 			print("Looking to extract based on gene expression of ",extracted)
 			self.load_data()
 			self.filter_data(adata)
-			self.adata_preProcessed = adata.copy()
+			self.adata_postFiltered = adata.copy()
 			self.preprocess_data(adata)
 			adata_ext = adata[adata.raw[:,extracted].X>1.5,:]
 
-		# sca_dict_ext = copy.deepcopy(sca_dict)
-		# sca_dict_ext.update(analysis_params = analysis_params_ext) # Use new analysis parameters
 		self.set_analysis_params(**(analysis_params_ext))
 		self.run_analysis(adata_ext)
 
@@ -778,13 +891,13 @@ class sca_run:
 		adata_ext = self.plot_sca(adata_ext,figdir = ''.join([figdir,'extracted/',label,'/']))
 
 		self.adata = adata_ext.copy()
+		## Write a summary of the analysis to a text file including sample information and parameters
+		self.write_summary(figdir=''.join([figdir,'extracted/',label,'/']))
+
 		## Save analysis information and relevant AnnData objects to the disk using the Pickle module
 		if new_save:
 			pickle.dump(self,open(''.join([figdir,'extracted/',label,'/',new_save]),"wb"),protocol=4)
 
-		## Write a summary of the analysis to a text file including sample information and parameters
-		self.write_summary(figdir=''.join([figdir,'extracted/',label,'/']))
-
 		print("\nAll done!\n")
 
-		return sca_run
+		return self
