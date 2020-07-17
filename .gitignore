@@ -126,5 +126,4 @@ dmypy.json
 
 figures/
 data/
-*.txt
 /tools/__pycache__/
