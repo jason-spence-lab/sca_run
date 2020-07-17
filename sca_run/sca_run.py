@@ -70,12 +70,14 @@ class sca_run:
 		self.final_cell_count = None
 		self.final_gene_count = None
 		self.annotation_dict = dict()
+		self.doublet_clf = None
 
 		## adata
 		self.adata = None
 		self.adata_preFiltered = None
-		self.adata_unscaled = None
+		# self.adata_unscaled = None
 		self.adata_postFiltered = None
+
 
 
 	## Function to set a list of genes and save relevant information in a dictionary of gene lists
@@ -107,7 +109,7 @@ class sca_run:
 				setattr(self,key,arg_dict[key])
 
 	## Define function to generate a color gradient from a defined starting and ending color
-	def __make_cmap(self,colors, position=None, bit=False):
+	def make_cmap(self,colors, position=None, bit=False):
 		'''
 		make_cmap takes a list of tuples which contain RGB values. The RGB
 		values may either be in 8-bit [0 to 255] (in which bit must be set to
@@ -301,6 +303,135 @@ class sca_run:
 					# f.write(json.dumps(str(self.__count_cluster_scores(self.adata, ''.join([cell_score_list,'_processed'])))))
 		return 0
 
+	## Writing metadata and counts csv files to be used as inputs into CellphoneDB analysis
+	# Uses log-normalized counts
+	def write_cpdb_data(self, figdir='/figures/'):
+		adata = self.adata.copy()
+		df_meta = pd.DataFrame(data=[])
+		os.makedirs(os.path.dirname(''.join([figdir,'data_csvs/'])), exist_ok=True) 
+		adata.obs.loc[:,['louvain']].to_csv(''.join([figdir,'data_csvs/metadata.csv']))
+
+		## Export raw counts file
+		adata_postfiltered = self.adata_postFiltered.copy()
+		# sc.pp.normalize_total(adata_postfiltered)#,target_sum=10000)
+		adata_raw = adata.raw.copy()
+
+		df = pd.DataFrame(adata_raw.X.T.toarray())
+		df.columns = adata_postfiltered.obs.index
+		df.set_index(adata_postfiltered.var.index, inplace=True)
+		print(df)
+
+		df.to_csv(''.join([figdir,'/data_csvs/counts.csv']))
+		return 0
+
+	def plot_colorbar(self,mappable, fig, subplot_spec, max_cbar_height: float = 4.0):
+		"""
+		Plots a vertical color bar based on mappable.
+		The height of the colorbar is min(figure-height, max_cmap_height)
+		Parameters
+		----------
+		mappable
+			The image to which the colorbar applies.
+		fig
+			The figure object
+		subplot_spec
+			The gridspec subplot. Eg. axs[1,2]
+		max_cbar_height
+			The maximum colorbar height
+		Returns
+		-------
+		color bar ax
+		"""
+		width, height = fig.get_size_inches()
+		if height > max_cbar_height:
+			# to make the colorbar shorter, the
+			# ax is split and the lower portion is used.
+			from matplotlib import gridspec
+			axs2 = gridspec.GridSpecFromSubplotSpec(
+				2,
+				1,
+				subplot_spec=subplot_spec,
+				height_ratios=[height - max_cbar_height, max_cbar_height],
+			)
+			heatmap_cbar_ax = fig.add_subplot(axs2[1])
+		else:
+			heatmap_cbar_ax = fig.add_subplot(subplot_spec)
+		plt.colorbar(mappable, cax=heatmap_cbar_ax)
+		return heatmap_cbar_ax
+
+	#### Function for plotting cellphonedb data
+	# plot_type is 'means' for regular heatmap of significant means per interaction
+	# plot_type is 'counts' for matrix plot or total significant means for each grouping
+	def plot_cpdb_heatmap(self, plotted_vals, plot_type='means', figsave='cellphone_heatmap.png', y_labels=[]):
+		if plot_type=='means':
+			feature_colors = [(210,210,210), (210,210,210), (245,245,200), (100,200,225), (0,45,125)]
+			position=[0, 0.019999, 0.02, 0.55, 1]
+		elif plot_type=='counts':
+			feature_colors = [(220,220,220), (25,25,25)]
+			position=[0,1]
+
+		my_feature_cmap = self.make_cmap(feature_colors,position=position,bit=True)
+
+		colorbar_width = 0.3
+
+		height = 5
+		heatmap_width = 5
+		width = heatmap_width
+
+		height_ratios = [0, height]
+
+		width_ratios = [
+			heatmap_width,
+			colorbar_width,
+		]
+		fig = plt.figure(figsize=(width+2, height))
+
+		from matplotlib import gridspec
+		axs = gridspec.GridSpec(
+			nrows=2,
+			ncols=2,
+			width_ratios=width_ratios,
+			wspace=0.15 / width,
+			hspace=0.13 / height,
+			height_ratios=height_ratios,
+		)
+
+		heatmap_ax = fig.add_subplot(axs[1, 0])
+		im = heatmap_ax.imshow(
+			plotted_vals.values, aspect='auto', interpolation="nearest",
+			cmap=my_feature_cmap
+		)
+		heatmap_ax.set_ylim(plotted_vals.shape[0] - 0.5, -0.5)
+		heatmap_ax.set_xlim(-0.5, plotted_vals.shape[1] - 0.5)
+		heatmap_ax.grid(False)
+		heatmap_ax.tick_params(axis='x', labelsize='small', labelrotation=90)
+		heatmap_ax.set_xticks(np.arange(len(plotted_vals.columns)))
+		heatmap_ax.set_xticklabels(plotted_vals.columns)
+
+		if plot_type=='means':
+			if y_labels:
+				heatmap_ax.tick_params(axis='y', labelsize='small')
+				y_label_indices = [plotted_vals.index.get_loc(label) for label in y_labels]
+				# print(plotted_vals.index.get_loc('NOTCH4_DLL4','PDGFB-PDGFRB','CCL12_CXCR4','EGFR_HBEGF'))
+				heatmap_ax.set_yticks(y_label_indices)
+				heatmap_ax.set_yticklabels(y_labels)
+			else:
+				# heatmap_ax.tick_params(axis='y', left=False, labelleft=False)
+				heatmap_ax.tick_params(axis='y', labelsize='small')
+				# heatmap_ax.set_ylabel('')
+				heatmap_ax.set_yticks(np.arange(len(plotted_vals.index)))
+				heatmap_ax.set_yticklabels(plotted_vals.index)
+		elif plot_type=='counts':
+			heatmap_ax.tick_params(axis='y', labelsize='small')
+			heatmap_ax.set_yticks(np.arange(len(plotted_vals.index)))
+			heatmap_ax.set_yticklabels(plotted_vals.index)
+		else:
+			heatmap_ax.tick_params(axis='y', left=False, labelleft=False)
+			heatmap_ax.set_ylabel('')
+		
+		self.plot_colorbar(im, fig, axs[1, 1])
+		plt.savefig(figsave,bbox_inches='tight')
+
 	## Remove a specified list of genes from AnnData object
 	def filter_specific_genes(self,adata, text_file=None, gene_list=[]):
 		'''
@@ -311,9 +442,8 @@ class sca_run:
 		if text_file:
 			for line in open(text_file,'r'):
 				gene_list.append(line.rstrip('\n'))
-		a = [(gene not in gene_list) for gene in adata.var_names]
 		
-		return adata[:, [(gene not in gene_list) for gene in adata.var_names]]
+		return adata[:, [(gene not in gene_list) for gene in adata.var_names]].copy()
 
 	## Takes a list of genes and determines if they exist within the data set and are variable
 	# Appends results to genes_exist or missing_genes list if given
@@ -402,10 +532,11 @@ class sca_run:
 		self.initial_cell_count = len(adata.obs_names)
 		self.initial_gene_count = len(adata.var_names)
 
-		# clf = doubletdetection.BoostClassifier()
-		# print(type(adata.X))
-		# labels = clf.fit(adata.X.toarray()).predict()
-		# print(labels)
+		# # Conducting DoubletDetector analysis by Jonathan Shor
+		# print("Starting doublet detection")
+		# clf = doubletdetection.BoostClassifier(n_iters=50, use_phenograph=False, standard_scaling=True)
+		# adata.obs['doublet_labels'] = clf.fit(adata.X.toarray()).predict(p_thresh=1e-16, voter_thresh=0.5)
+		# self.doublet_clf = clf
 
 		## Basic filtering to get rid of useless cells and unexpressed genes
 		sc.pp.filter_genes(adata, min_cells=param_dict['min_cells'])
@@ -416,7 +547,7 @@ class sca_run:
 		mito_genes = adata.var_names.str.startswith('MT-')
 		try:
 			adata.obs['percent_mito'] = np.sum(adata[:,mito_genes].X, axis=1).A1 / np.sum(adata.X, axis=1).A1
-
+			print("running this")
 			# add the total counts per cell as observations-annotation to adata
 			adata.obs['n_counts'] = adata.X.sum(axis=1).A1
 		except:
@@ -431,7 +562,12 @@ class sca_run:
 		## Actually do the filtering.
 		adata = adata[((adata.obs['n_genes'] < param_dict['max_genes'])   # Keep cells with less than __ genes to remove most doublets
 					& (adata.obs['n_counts'] < param_dict['max_counts'])   # Keep cells with less than __ UMIs to catch a few remaining doublets
-					& (adata.obs['percent_mito'] < param_dict['max_mito']))]   # Keep cells with less than __ mito/genomic gene ratio
+					& (adata.obs['percent_mito'] < param_dict['max_mito']))].copy()   # Keep cells with less than __ mito/genomic gene ratio
+
+		## Testing for doublet_detection
+		# adata = adata[((adata.obs['labels'] != 1)
+		# 			& (adata.obs['percent_mito'] < param_dict['max_mito']))] 
+		# adata = adata[adata.obs['percent_mito'] < param_dict['max_mito']]
 
 		return adata
 
@@ -448,14 +584,15 @@ class sca_run:
 	def preprocess_data(self,adata):
 		## Normalize the expression matrix to median reads per cell, so that counts become comparable among cells.
 		# This corrects for differences in sequencing depth between cells and samples
-		sc.pp.normalize_total(adata)
+		# adata=adata.copy()
+		sc.pp.normalize_total(adata)#,target_sum=10000)
 
 		## Log transform the data.
 		sc.pp.log1p(adata)
 
 		## Set the .raw attribute of AnnData object to the logarithmized raw gene expression for later use in differential testing and visualizations of gene expression.
 		# We need to do this because the expression matrix will be rescaled and centered which flattens expression too much for some purposes
-		adata.raw = adata
+		adata.raw = adata.copy()
 
 		## Find cell type score for each cell based on a predefined set of gene lists
 		if self.cell_score_lists:
@@ -467,12 +604,11 @@ class sca_run:
 
 				adata.obs[file] = adata_scaled.X[:,adata_scaled.var_names.isin(score_list)].mean(1)
 
-				# sc.tl.score_genes(adata, score_list, ctrl_size=50, gene_pool=None, n_bins=25, score_name=file+'_raw_scaled', random_state=0, copy=False, use_raw=True)
-				#adata.obs[file+'_raw_scaled']=copy.deepcopy(adata_score_temp.obs[file+'_raw_scaled'])
+				# sc.tl.score_genes(adata_scaled, score_list, ctrl_size=50, gene_pool=None, n_bins=25, score_name=file+'_raw_scaled', random_state=0, copy=False, use_raw=True)
+				# adata.obs[file+'_raw_scaled']=copy.deepcopy(adata_scaled.obs[file+'_raw_scaled'])
 
 			# adata.X = copy.deepcopy(adata.raw.X)
 
-		print(adata)
 		## Identify highly-variable genes based on dispersion relative to expression level.
 		sc.pp.highly_variable_genes(adata, min_mean=0.0125, max_mean=3, min_disp=0.5)
 
@@ -495,7 +631,7 @@ class sca_run:
 
 		## Scale each gene to unit variance. Clip values exceeding standard deviation 10 to remove extreme outliers
 		sc.pp.scale(adata, max_value=10)
-		return adata
+		return adata.copy()
 
 	## Run dimensional reduction analysis and clustering using KNN graph
 	def run_analysis(self,adata, n_neighbors=None, n_pcs=None, spread=None,
@@ -565,17 +701,17 @@ class sca_run:
 		## Create my custom palette for FeaturePlots and define a matlplotlib colormap object
 		if self.umap_feature_color=='blue_orange':
 			feature_colors = [(35,35,142), (255,127,0)]
-			my_feature_cmap = self.__make_cmap(feature_colors,bit=True)
+			my_feature_cmap = self.make_cmap(feature_colors,bit=True)
 		elif self.umap_feature_color=='yellow_blue':
 			feature_colors = [(210,210,210), (210,210,210), (245,245,200), (100,200,225), (0,45,125)]
 			position=[0, 0.019999, 0.02, 0.55, 1]
-			my_feature_cmap = self.__make_cmap(feature_colors,bit=True,position=position)
+			my_feature_cmap = self.make_cmap(feature_colors,bit=True,position=position)
 		else:
 			feature_colors = [(210,210,210), (210,210,210), (245,245,200), (100,200,225), (0,45,125)]
 			position=[0, 0.019999, 0.02, 0.55, 1]
-			my_feature_cmap = self.__make_cmap(feature_colors,bit=True,position=position)
+			my_feature_cmap = self.make_cmap(feature_colors,bit=True,position=position)
 
-		gray_cmap = self.__make_cmap([(220,220,220),(220,220,220)], bit=True)
+		gray_cmap = self.make_cmap([(220,220,220),(220,220,220)], bit=True)
 
 
 		## Check to see if user specified a color palette for categorical umap plots, ie. louvain, obs_fields
@@ -608,10 +744,10 @@ class sca_run:
 					 jitter=0.4, multi_panel=True, save='_postFiltered_plot.png', show=False)
 		if self.adata_preFiltered:
 			sc.pl.violin(self.adata_preFiltered, ['n_genes','n_counts','percent_mito'],
-		 			 	jitter=0.4, multi_panel=True, save='_preFiltered_plot.png', show=False)
+						jitter=0.4, multi_panel=True, save='_preFiltered_plot.png', show=False)
 
 		## Draw the PCA elbow plot to determine which PCs to use
-		sc.pl.pca_variance_ratio(adata, log=True, n_pcs=100, save='_elbowPlot.png', show=False)
+		sc.pl.pca_variance_ratio(adata, log=True, n_pcs=50, save='_elbowPlot.png', show=False)
 		## Ranks and displays most contributing genes for each principal component
 		components = 4
 		loadings_components = range(self.n_pcs-components, self.n_pcs+components+1)
@@ -636,12 +772,14 @@ class sca_run:
 				if comparison == 'all':
 					comparison=None
 				self.__rank_genes(adata,rank_grouping,figdir=figdir,clusters2_compare=comparison)
-			sc.pl.rank_genes_groups_heatmap(adata, n_genes=n_genes_rank, use_raw=True, show=False, 
-					save=''.join(['_rank_heatmap_',rank_grouping,file_type]), cmap=my_feature_cmap)
-			sc.pl.rank_genes_groups_dotplot(adata, n_genes=n_genes_rank, use_raw=True, show=False, 
-					save=''.join(['_rank_dotplot_',rank_grouping,file_type]), color_map=my_feature_cmap)
-			sc.pl.rank_genes_groups_stacked_violin(adata, n_genes=n_genes_rank, use_raw=True, 
-					show=False, save=''.join(['_rank_violin_',rank_grouping,file_type]))
+
+			if 'all' in self.clusters2_compare:
+				sc.pl.rank_genes_groups_heatmap(adata, n_genes=n_genes_rank, use_raw=True, show=False, 
+						save=''.join(['_rank_heatmap_',rank_grouping,file_type]), cmap=my_feature_cmap)
+				sc.pl.rank_genes_groups_dotplot(adata, n_genes=n_genes_rank, use_raw=True, show=False, 
+						save=''.join(['_rank_dotplot_',rank_grouping,file_type]), color_map=my_feature_cmap)
+				sc.pl.rank_genes_groups_stacked_violin(adata, n_genes=n_genes_rank, use_raw=True, 
+						show=False, save=''.join(['_rank_violin_',rank_grouping,file_type]))
 
 		## Feature plots and dot plot analysis for each specified set of genes
 		#sc.pl.rank_genes_groups(adata, n_genes=25, sharey=False, save='_markerPlots.png', show=False)
@@ -694,14 +832,19 @@ class sca_run:
 		genes_noseq = [gene for gene in missing_genes if (gene not in empty_genes)]
 		print('Zero genes: ', empty_genes, '\n')
 		print('Gene not in dataset: ', genes_noseq, '\n')
-		sc.pl.umap(adata, color=empty_genes, save=''.join(['_featureplots_gray',file_type]), 
-				show=False, cmap=gray_cmap, size=size, use_raw=True)
+		if empty_genes:
+			sc.pl.umap(adata, color=empty_genes, save=''.join(['_featureplots_gray',file_type]), 
+					show=False, cmap=gray_cmap, size=size, use_raw=True)
 
 		# tSNE Plots - should move to integrate in umap code
 		if self.do_tSNE:
 			sc.pl.tsne(adata, color=missing_genes, save=''.join(['_featureplots_gray',file_type]), 
 					show=False, cmap=gray_cmap, size=size, use_raw=True)
 		
+		# sc.pl.umap(adata, color='doublet_labels', save='doublet_test.png', show=False, edges=False, size=size)
+		# f = doubletdetection.plot.convergence(self.doublet_clf, save=''.join([figdir,'convergence_test.pdf']), show=False, p_thresh=1e-16, voter_thresh=0.5)
+		# f3 = doubletdetection.plot.threshold(self.doublet_clf, save=''.join([figdir,'threshold_test.pdf']), show=False, p_step=6)
+
 		# Generate a umap feature plot based on cell scoring
 		if self.cell_score_lists:
 			print(self.vmax_list)
@@ -761,6 +904,8 @@ class sca_run:
 		sc.pl.scatter(adata,x='jitter',y='n_counts',color='louvain',save='_n_counts.png',palette=colors,show=False)
 		sc.pl.scatter(adata,x='jitter',y='percent_mito',color='louvain',save='_percent_mito.png',palette=colors,show=False)
 
+		sc.pl.umap(adata,color=['n_genes','n_counts','percent_mito'],color_map=my_feature_cmap,save='_counts_check.png',show=False)
+
 		# Set the thresholds and scaling factors for drawing the paga map/plot
 		node_size_scale=1.25
 		node_size_power=0.9
@@ -769,16 +914,16 @@ class sca_run:
 		max_edge_width=2
 		threshold=0.08
 		# Draw the actual plot 
-		sc.pl.paga(adata, layout='fr', threshold=threshold, node_size_scale=node_size_scale, 
-			node_size_power=node_size_power, edge_width_scale=edge_width_scale,
-			min_edge_width=min_edge_width, max_edge_width=max_edge_width, show=False, save = '_pagaPlot.png',
-			title='PAGA: Fruchterman Reingold',
-			frameon=False)
+		# sc.pl.paga(adata, layout='fr', threshold=threshold, node_size_scale=node_size_scale, 
+		# 	node_size_power=node_size_power, edge_width_scale=edge_width_scale,
+		# 	min_edge_width=min_edge_width, max_edge_width=max_edge_width, show=False, save = '_pagaPlot.png',
+		# 	title='PAGA: Fruchterman Reingold',frameon=False)
 		
 		return adata
 
 	## Most basic pipeline - Input data and output all figures
-	def pipe_basic(self,figdir='./figures/', adata_filtered=None, adata_loaded=None, load_save=None, new_save='adata_save.p', remove_genes=None, final_quality=False):
+	def pipe_basic(self,figdir='./figures/', adata_filtered=None, adata_loaded=None, load_save=None, 
+				   new_save='adata_save.p', remove_genes=None, final_quality=False, only_plot=False):
 		'''
 		sca_dict is a dictionary of miscellaneous analysis information including
 		parameters, sample list and gene_lists
@@ -793,7 +938,7 @@ class sca_run:
 			self.vmin_list = run_save.vmin_list
 			self.vmax_list = run_save.vmax_list
 			self.adata_preFiltered = run_save.adata_preFiltered
-			self.adata_unscaled = run_save.adata_unscaled
+			# self.adata_unscaled = run_save.adata_unscaled
 			self.adata_postFiltered = run_save.adata_postFiltered
 			self.annotation_dict = run_save.annotation_dict
 			self.initial_cell_count = run_save.initial_cell_count
@@ -818,8 +963,9 @@ class sca_run:
 			adata = self.preprocess_data(adata)
 			print(adata)
 
-		## Dimensional reduction and clustering - construction of the neighborhood graph
-		adata = self.run_analysis(adata)
+		if not only_plot:
+			## Dimensional reduction and clustering - construction of the neighborhood graph
+			adata = self.run_analysis(adata)
 
 		## Plot figures
 		adata = self.plot_sca(adata,figdir=figdir)
@@ -860,7 +1006,7 @@ class sca_run:
 			self.vmin_list = run_save.vmin_list
 			self.vmax_list = run_save.vmax_list
 			self.adata_preFiltered = run_save.adata_preFiltered
-			self.adata_unscaled = run_save.adata_unscaled
+			# self.adata_unscaled = run_save.adata_unscaled
 			self.adata_postFiltered = run_save.adata_postFiltered
 			self.annotation_dict = run_save.annotation_dict
 			self.initial_cell_count = run_save.initial_cell_count
