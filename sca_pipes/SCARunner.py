@@ -1,6 +1,6 @@
 '''
 Applications of single cell data analysis techniques
-Written by Josh Wu and Mike Czerwinski
+Written by Josh Wu
 8 May, 2020
 
 Relies heavily on the Scanpy Python module developed by the Theis Lab
@@ -27,6 +27,9 @@ import _pickle as pickle
 import DoubletDetection as doubletdetection
 
 class sca_run:
+	'''
+	Service to apply single cell data analysis techniques and pipelines
+	'''
 	sc.settings.verbosity = 3
 
 	def __init__(self):
@@ -369,6 +372,9 @@ class sca_run:
 		elif plot_type=='counts':
 			feature_colors = [(220,220,220), (25,25,25)]
 			position=[0,1]
+		else:
+			feature_colors = [(210,210,210), (210,210,210), (245,245,200), (100,200,225), (0,45,125)]
+			position=[0, 0.019999, 0.02, 0.55, 1]
 
 		my_feature_cmap = self.make_cmap(feature_colors,position=position,bit=True)
 
@@ -529,6 +535,7 @@ class sca_run:
 		'''
 		# If argument is None, set to instance attribute
 		param_dict = {k:(v if v else getattr(self,k)) for (k,v) in locals().items()}
+		
 		self.initial_cell_count = len(adata.obs_names)
 		self.initial_gene_count = len(adata.var_names)
 
