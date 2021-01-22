@@ -1018,20 +1018,20 @@ class sca_run:
 				self.adata_postFiltered = adata_ext.copy()
 
 				## Reprocess and recluster extracted cells
-				self.preprocess_data(adata_ext)
+				adata_ext = self.preprocess_data(adata_ext)
 			else:
 				self.adata_postFiltered = self.adata_postFiltered[adata.obs['louvain'].isin(extracted)].copy()
 				adata_ext = self.adata[adata.obs['louvain'].isin(extracted)].copy()
 		else:
 			print("Looking to extract based on gene expression of ",extracted)
-			self.load_data()
-			self.filter_data(adata)
+			adata_ext = self.load_data()
+			adata_ext = self.filter_data(adata)
 			self.adata_postFiltered = adata.copy()
-			self.preprocess_data(adata)
+			adata_ext = self.preprocess_data(adata)
 			adata_ext = adata[adata.raw[:,extracted].X>1.5,:]
 
 		self.set_analysis_params(**(analysis_params_ext))
-		self.run_analysis(adata_ext)
+		adata_ext = self.run_analysis(adata_ext)
 
 		## Plot figures
 		adata_ext = self.plot_sca(adata_ext,figdir = ''.join([figdir,'extracted/',label,'/']))
