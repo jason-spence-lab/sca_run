@@ -5,11 +5,13 @@ Written by Joshua Wu
 5 August, 2020
 '''
 
-import sca_params
+from sca_params import *
 
 figdir = './figures/'
-params_test = sca_params.sca_params()
+params_test = sca_params()
 
+sca_params.storage_mount_point = 'X:/'
+sca_params.species = 'mouse'
 
 ## List of interesting genes
 params_test.add_gene_list(markers= ['CDH5','VIM','FLT1','TP63','VWF','EMCN','CDH1','KRT8','EPCAM'],
@@ -20,6 +22,7 @@ params_test.add_gene_list(markers= ['CDH5','VIM','FLT1','TP63','VWF','EMCN','CDH
 
 print("Gene List")
 print(params_test.gene_dict)
+print("\n")
 
 ## Parameters used to filter the data - Mainly used to get rid of bad cells
 params_test.set_filter_params(min_cells = 0, 
@@ -31,6 +34,7 @@ params_test.set_filter_params(min_cells = 0,
 print("Filter Params")
 print(params_test.filter_params)
 print(params_test.get_filter_dict())
+print("\n")
 
 ## Parameters used for initial clustering analysis
 params_test.set_analysis_params(n_neighbors = 15, 
@@ -44,6 +48,7 @@ params_test.set_analysis_params(n_neighbors = 15,
 print("Analysis Params")
 print(params_test.analysis_params)
 print(params_test.get_analysis_dict())
+print("\n")
 
 params_test.set_plot_params(size=5,
 					   umap_obs=['age'],
@@ -58,15 +63,4 @@ params_test.set_plot_params(size=5,
 
 print("Plot Params")
 print(params_test.plot_params)
-
-## If you find some interesting clusters that you want to "zoom in" on and recluster, you can use the following code
-
-# New analysis parameters for the subset of parameters
-analysis_params_ext = dict(n_neighbors = 9,
-						n_pcs = 10,
-						spread = 1,
-						min_dist = 0.4,
-						resolution = 0.4)
-
-# an_run.pipe_ext(analysis_params_ext, figdir=figdir, extracted=['2'], load_save='adata_save.p')
-
+print(params_test.get_plot_dict())
