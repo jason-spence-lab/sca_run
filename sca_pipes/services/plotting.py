@@ -115,8 +115,9 @@ class plotting:
 			if sca_params.analysis_params.do_tSNE:
 				sc.pl.tsne(adata, color=observation, save=''.join(['_',observation,file_type]), show=False, 
 							legend_loc=legend, edges=False, size=size, palette=colors, alpha=0.75)
-
-		## Find marker genes via Wilxocon test based on Louvain cluster assignment
+		# sc.external.pl.phate(adata,gene_symbols=['CAV1','LY6D','KRT4','TP63','CDH1'], use_raw=True, color_map=my_feature_cmap,
+		# 					 save='phate.png', size=size)
+		## Find marker genes via Wilxocon test based on louvain cluster assignment
 		# Create a simple plot to show the top 25 most significant markers for each cluster
 		# Write most significant markers to a csv file
 		for rank_grouping in self.rank_grouping:		
@@ -201,7 +202,6 @@ class plotting:
 
 		# Generate a umap feature plot based on cell scoring
 		if sca_params.cell_score_lists:
-			print(self.vmax_list)
 			max_list_len = max([len(self.vmax_list),len(self.vmin_list),len(sca_params.cell_score_lists)])
 			if not self.vmax_list:
 				vmax = [adata.obs.loc[:,sca_params.cell_score_lists].values.max()]*max_list_len
@@ -221,8 +221,18 @@ class plotting:
 						   save=''.join(['_',score_name,'_cellType_score_0min.png']), show=False, edges=False, color_map=my_feature_cmap, 
 						   size=size, vmin=0, vmax=vmax[i])
 
-			sc.pl.violin(adata,sca_params.cell_score_lists, 
-						 jitter=0.4, save='_cell_scores.png',show=False,multi_panel=False,rotation=90)
+			sc.pl.violin(adata,sca_params.cell_score_lists, groupby='sampleName',
+						 jitter=0.4, save='_cell_scores.png',show=False,multi_panel=True,rotation=90)
+
+		if sca_params.analysis_params.dpt:
+			sc.pl.diffmap(adata, color=['dpt_pseudotime', 'louvain'], size=self.size, show=False,
+						  save=''.join([sca_params.analysis_params.dpt[0],'.png']))
+			sc.pl.umap(adata, color='dpt_pseudotime', size=self.size, show=False,
+					   save=''.join(['_','dpt','_',sca_params.analysis_params.dpt[0],'.png']))
+			# sc.pl.dpt_groups_pseudotime(adata, color_map=my_feature_cmap, 
+			# 							save=''.join([sca_params.analysis_params.dpt[0],sca_params.analysis_params.dpt[1],'.png']))
+			# sc.pl.dpt_timeseries(adata, color_map=my_feature_cmap, show=False,
+			# 					 save=''.join([sca_params.analysis_params.dpt[0],sca_params.analysis_params.dpt[1],'.png']))
 
 		# ## Violin plot for comparing gene expression among different groups/clusters
 		# # Create observation field labeled using binary information
@@ -259,17 +269,16 @@ class plotting:
 		sc.pl.umap(adata,color=['n_genes','n_counts','percent_mito'],color_map=my_feature_cmap,save='_counts_check.png',show=False)
 
 		# Set the thresholds and scaling factors for drawing the paga map/plot
-		# node_size_scale=1.25
-		# node_size_power=0.9
-		# edge_width_scale=1
-		# min_edge_width=0.035
-		# max_edge_width=2
-		# threshold=0.08
-		# Draw the actual plot 
-		# sc.pl.paga(adata, layout='fr', threshold=threshold, node_size_scale=node_size_scale, 
-		# 	node_size_power=node_size_power, edge_width_scale=edge_width_scale,
-		# 	min_edge_width=min_edge_width, max_edge_width=max_edge_width, show=False, save = '_pagaPlot.png',
-		# 	title='PAGA: Fruchterman Reingold',frameon=False)
+		node_size_scale=1.25
+		node_size_power=0.9
+		edge_width_scale=1
+		min_edge_width=0.035
+		max_edge_width=2
+		threshold=0.08
+		sc.pl.paga(adata, layout='fr', threshold=threshold, node_size_scale=node_size_scale, 
+			node_size_power=node_size_power, edge_width_scale=edge_width_scale,
+			min_edge_width=min_edge_width, max_edge_width=max_edge_width, show=False, save = '_pagaPlot.png',
+			title='PAGA: Fruchterman Reingold',frameon=False)
 		
 		return adata
 
@@ -309,7 +318,7 @@ class plotting:
 		cmap = mpl.colors.LinearSegmentedColormap('my_colormap',cdict,256)
 		return cmap
 
-	## Writes results of rank genes analysis to multiple csv files, each representing a Louvain cluster
+	## Writes results of rank genes analysis to multiple csv files, each representing a louvain cluster
 	def __rank_genes(self,adata, groupby, clusters2_compare=None, figdir='./figures/'):
 		'''
 		groupby: Adata observation metadata categories to compare

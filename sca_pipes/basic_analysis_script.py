@@ -28,9 +28,12 @@ an_params.species = 'human'
 an_params.sample_list = ['2757-1','2761-1']
 
 ## List of interesting genes
-an_params.add_gene_list(markers= ['CDH5','KDR','FLT1','NOS3','VWF','EMCN','CDH1','KRT8','EPCAM','ITGAM',
-							   'PTPRC','COL1A1','COL1A2','PDGFRA','S100B','STMN2','TUBB3'],
-					    label='basic_list')
+an_params.add_gene_list(markers = ['CDH5','KDR','FLT1','NOS3','VWF','EMCN','CDH1','KRT8','EPCAM','ITGAM'],
+					    label = 'basic_list_1')
+
+an_params.add_gene_list(markers = ['PTPRC','COL1A1','COL1A2','PDGFRA','S100B','STMN2','TUBB3'],
+						label = 'basic_list_1',
+						cell_score_list = 'Both')
 
 ## Parameters used to filter the data - Mainly used to get rid of bad cells
 an_params.set_qc_params(min_cells = 0, # Filter out genes with a few number of cells
@@ -73,5 +76,5 @@ analysis_params_ext = dict(n_neighbors = 9,
 						min_dist = 0.4,
 						resolution = 0.4)
 
-an_run.pipe_ext(analysis_params_ext, figdir=figdir, extracted=['2'], load_save='adata_save.p')
+# an_run.pipe_ext(analysis_params_ext, figdir=figdir, extracted=['2'], load_save='adata_save.p')
 

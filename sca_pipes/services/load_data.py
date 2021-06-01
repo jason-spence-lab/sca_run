@@ -93,7 +93,7 @@ class load_data:
 		New filled AnnData object
 		'''
 		metadata_list = annotation_dict[sampleID][1:]
-		newAdata = sc.read_10x_h5(''.join([storage_mount_point, annotation_dict[sampleID][0]]))# genome='hg19' or genome='GRCh38'
+		newAdata = sc.read_10x_h5(''.join([storage_mount_point, annotation_dict[sampleID][0]]))#,genome='GRCh38')# genome='hg19' or genome='GRCh38'
 
 		## Set gene names to be unique since there seem to be duplicate names from Cellranger
 		newAdata.var_names_make_unique()

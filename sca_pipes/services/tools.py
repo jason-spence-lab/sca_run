@@ -6,6 +6,7 @@ Written by Joshua H Wu
 09 March, 2021
 '''
 import scanpy as sc
+import numpy as np
 
 class tools:
 
@@ -20,6 +21,7 @@ class tools:
 			resolution: High resolution attempts to increases # of clusters identified
 			do_bbknn: Run batch balanced k-nearest neighbors batch correction algorithm
 			do_tSNE: Run tSNE dimensional reduction analysis
+			dpt: Run diffusion pseudotime analysis with input: ['metadata_cat','group']
 		'''
 		self.n_neighbors = analysis_params.n_neighbors
 		self.n_pcs = analysis_params.n_pcs
@@ -28,6 +30,7 @@ class tools:
 		self.resolution = analysis_params.resolution
 		self.do_bbknn = analysis_params.do_bbknn
 		self.do_tSNE = analysis_params.do_tSNE
+		self.dpt = analysis_params.dpt
 
 	## Run dimensional reduction analysis and clustering using KNN graph
 	def run_tools(self,
@@ -42,8 +45,8 @@ class tools:
 		# Note that doing this may override previous sc.pp.neighbors()
 		if self.do_bbknn:
 			import bbknn
-			bbknn.bbknn(adata, batch_key='sampleName', copy=False, 
-						n_pcs=self.n_pcs, neighbors_within_batch=self.n_neighbors)
+			bbknn.bbknn(adata, batch_key='sampleName', copy=False)#, 
+						# n_pcs=self.n_pcs, neighbors_within_batch=self.n_neighbors)
 			#sc.pp.external.mnn_correct(adata,batch_key='sampleName') # Testing another algorithm
 		else:
 			## Compute nearest-neighbors
@@ -56,8 +59,15 @@ class tools:
 		if self.do_tSNE:
 			sc.tl.tsne(adata, n_pcs=self.n_pcs)
 
-		## Calculate cell clusters via Louvain algorithm
+		## Calculate cell clusters via louvain algorithm
 		sc.tl.louvain(adata, resolution=self.resolution)
+		# sc.external.tl.phate(adata)
+
+		if self.dpt:
+			adata.uns['iroot'] = np.flatnonzero(adata.obs[self.dpt[0]].isin(self.dpt[1]))[0]
+			print(adata.uns['iroot'])
+			sc.tl.diffmap(adata)
+			sc.tl.dpt(adata, n_branchings=0, n_dcs=10)
 
 		## Run PAGA to predict non-directional cluster-cluster relationships to infer possible developmental progressions
 		sc.tl.paga(adata, groups='louvain', model='v1.2')

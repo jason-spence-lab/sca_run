@@ -24,15 +24,12 @@ import matplotlib.pyplot as plt
 import random
 import math
 import _pickle as pickle
-import DoubletDetection as doubletdetection
 import classes.sca_params as sca_params
 import services.load_data as load_data
 import services.quality_control as quality_control
 import services.preprocess as preprocess
 import services.tools as tools
 import services.plotting as plotting
-
-
 
 class SCARunner:
 	sc.settings.verbosity = 3
@@ -91,7 +88,7 @@ class SCARunner:
 				adata = adata_filtered.copy()
 
 			sca_params.adata_postQC = adata.copy() # Save for later in case of necessary extraction
-			pp = preprocess.preprocess(sca_params.gene_dict)
+			pp = preprocess.preprocess(sca_params.gene_dict, sca_params.pp_params)
 			adata = pp.run_preprocess(adata).copy()
 			sca_params.adata_unscaled = pp.adata_unscaled.copy()
 
@@ -110,7 +107,7 @@ class SCARunner:
 
 		## Save analysis information and relevant AnnData objects to the disk using the Pickle module
 		if new_save:
-			pickle.dump(self,open(''.join([figdir,new_save]),"wb"),protocol=4)
+			pickle.dump(sca_params,open(''.join([figdir,new_save]),"wb"),protocol=4)
 
 		print("\nAll done!\n")
 
@@ -119,7 +116,7 @@ class SCARunner:
 	## Pipeline for analysis in which you extract interesting clusters/observations after an initial run
 	# Extracts clusters to an filtered but unprocessed AnnData object, then reprocesses and reclusters
 	def pipe_ext(self, sca_params, extracted, figdir='./figures/', load_save=None, new_save='adata_save.p', label='',
-				 preprocess=True):
+				 no_preprocess=False):
 		'''
 		Allows loading of a saved pickle adata file, file must contained adata that has gone through a complete pipeline
 		Otherwise will complete a new full analysis, and then extracts clusters
@@ -141,20 +138,21 @@ class SCARunner:
 			# self.vmin_list = run_save.vmin_list
 			# self.vmax_list = run_save.vmax_list
 			sca_params.adata_preQC = run_save.adata_preQC
-			sca_paramsf.adata_unscaled = run_save.adata_unscaled
+			sca_params.adata_unscaled = run_save.adata_unscaled
 			sca_params.adata_postQC = run_save.adata_postQC
 			sca_params.annotation_dict = run_save.annotation_dict
 			sca_params.initial_cell_count = run_save.initial_cell_count
 			sca_params.initial_gene_count= run_save.initial_gene_count
 
-			if preprocess:
+			if not no_preprocess:
 				## Create an unprocessed AnnData object with the desired clusters
 				adata_ext = sca_params.adata_postQC[adata.obs['louvain'].isin(extracted)].copy()
 				sca_params.adata_postQC = adata_ext.copy()
 
 				## Reprocess and recluster extracted cells
-				pp = preprocess.preprocess(sca_params.gene_dict)
-				adata_ext = pp.preprocess_data(adata_ext)
+				pp = preprocess.preprocess(sca_params.gene_dict, sca_params.pp_params)
+				adata_ext = pp.run_preprocess(adata_ext)
+				sca_params.adata_unscaled = pp.adata_unscaled.copy()
 			else:
 				sca_params.adata_postQC = sca_params.adata_postQC[adata.obs['louvain'].isin(extracted)].copy()
 				adata_ext = sca_params.adata[adata.obs['louvain'].isin(extracted)].copy()
@@ -162,19 +160,20 @@ class SCARunner:
 			print(extracted, "is not a valid input")
 			return
 
-		self.set_analysis_params(**(analysis_params_ext))
-		adata_ext = self.run_analysis(adata_ext)
+		tl = tools.tools(sca_params.analysis_params)
+		adata_ext = tl.run_tools(adata_ext)
 
 		## Plot figures
-		adata_ext = self.plot_sca(adata_ext,figdir = ''.join([figdir,'extracted/',label,'/']))
+		scplt = plotting.plotting(sca_params.plot_params)
+		adata_ext = scplt.plot_sca(adata_ext,sca_params,figdir = ''.join([figdir,'extracted/',label,'/']))
 
-		self.adata = adata_ext.copy()
+		sca_params.adata = adata_ext.copy()
 		## Write a summary of the analysis to a text file including sample information and parameters
-		self.write_summary(figdir=''.join([figdir,'extracted/',label,'/']))
+		sca_params.write_summary(figdir=''.join([figdir,'extracted/',label,'/']), extracted=extracted)
 
 		## Save analysis information and relevant AnnData objects to the disk using the Pickle module
 		if new_save:
-			pickle.dump(self,open(''.join([figdir,'extracted/',label,'/',new_save]),"wb"),protocol=4)
+			pickle.dump(sca_params,open(''.join([figdir,'extracted/',label,'/',new_save]),"wb"),protocol=4)
 
 		print("\nAll done!\n")
 

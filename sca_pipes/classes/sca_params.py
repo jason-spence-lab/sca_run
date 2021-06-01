@@ -8,6 +8,11 @@ Written by Joshua H Wu
 
 from dataclasses import *
 from typing import List
+import json
+import csv
+import os
+import numpy as np
+import pandas as pd
 
 class sca_params:
 	'''
@@ -24,6 +29,7 @@ class sca_params:
 
 		## Quality control, analysis, and plot parameter dataclass objects
 		self.qc_params = qc_params()
+		self.pp_params = pp_params()
 		self.analysis_params = analysis_params()
 		self.plot_params = plot_params()
 
@@ -64,6 +70,9 @@ class sca_params:
 			markers = [line.rstrip('\n') for line in open(''.join([load_file,'.txt']),'r')]
 		if not cell_score_list is 'Only':
 			self.gene_lists.append(label)
+
+		if cell_score_list:
+			self.cell_score_lists.append(label)
 		self.gene_dict[label] = gene_list(markers=markers, 
 										  label=label,
 										  feature_positions=feature_positions,
@@ -102,6 +111,19 @@ class sca_params:
 	def get_qc_dict(self):
 		return asdict(self.qc_params)
 
+	def set_pp_params(self,
+					  combat='None'):
+		'''
+		Preprocess Params --
+			combat: Run Combat batch correction across the specified metadata field
+		'''
+		self.pp_params = pp_params(combat=combat)
+		return
+
+	## Return dictionary with filtering parameters
+	def get_pp_dict(self):
+		return asdict(self.qc_params)
+
 	## Creates object containing all of the analysis parameters and sets as attribute
 	def set_analysis_params(self,
 							n_neighbors=30,
@@ -110,7 +132,8 @@ class sca_params:
 							min_dist=0.4,
 							resolution=0.6,
 							do_bbknn=False,
-							do_tSNE=False):
+							do_tSNE=False,
+							dpt=[]):
 		'''
 		Analysis Params --
 			n_neighbors: Size of the local neighborhood used for manifold approximation
@@ -120,6 +143,7 @@ class sca_params:
 			resolution: High resolution attempts to increases # of clusters identified
 			do_bbknn: Run batch balanced k-nearest neighbors batch correction algorithm
 			do_tSNE: Run tSNE dimensional reduction analysis
+			dpt: Run diffusion pseudotime analysis with input: ['metadata_cat','group']
 		'''
 
 		self.analysis_params = analysis_params(n_neighbors=n_neighbors,
@@ -128,7 +152,8 @@ class sca_params:
 											   min_dist=min_dist,
 											   resolution=resolution,
 											   do_bbknn=do_bbknn,
-											   do_tSNE=do_tSNE)
+											   do_tSNE=do_tSNE,
+											   dpt=dpt)
 		return
 
 	## Return dictionary with analysis parameters
@@ -177,6 +202,104 @@ class sca_params:
 	def get_plot_dict(self):
 		return asdict(self.plot_params)
 
+	## Write a summary of the analysis run including sample information, parameters and filtering information
+	# Not completely up to date
+	def write_summary(self, figdir='./figures/', extracted=[]):
+		self.final_cell_count = len(self.adata.obs_names)
+		self.final_gene_count=len(self.adata.var_names)
+
+		summary_filename = ''.join([figdir,'summary/summary.txt'])
+
+		os.makedirs(os.path.dirname(summary_filename), exist_ok=True) # Create directory if it doesn't exist
+		with open(summary_filename,'w') as f:
+
+			f.write("Summary of single cell sequencing analysis for samples ")
+			f.write(''.join([' '.join(self.sample_list),'\n\n']))
+
+			f.write('--------Sample Metadata--------\n')
+			for sample in self.sample_list:
+				f.write(''.join(['- Sample ',sample,'\n']))
+				f.write('\n'.join(self.annotation_dict[sample]))
+				f.write('\n\n')
+
+			f.write('--------Basic Run Information--------\n')
+			f.write(''.join(['Initial cell count:  ',str(self.initial_cell_count),'\n']))
+			f.write(''.join(['Final cell count:  ',str(self.final_cell_count),'\n']))
+			f.write(''.join(['Initial gene count:  ',str(self.initial_gene_count),'\n']))
+			f.write(''.join(['Final gene count:  ',str(self.final_gene_count),'\n']))
+
+			f.write('\n--------Quality Control Parameters Used--------\n')
+			f.write(''.join(['Min Cells:  ',str(self.qc_params.min_cells),'\n']))
+			f.write(''.join(['Min Genes:  ',str(self.qc_params.min_genes),'\n']))
+			f.write(''.join(['Max Genes:  ',str(self.qc_params.max_genes),'\n']))
+			f.write(''.join(['Max Counts:  ',str(self.qc_params.max_counts),'\n']))
+			f.write(''.join(['Max Mito:  ',str(self.qc_params.max_mito),'\n']))
+			f.write(''.join(['DoubletDetection:  ',str(self.qc_params.doublet_detection),'\n']))
+
+			f.write('\n--------Analysis Parameters Used--------\n')
+			f.write(''.join(['# Neighbors:  ',str(self.analysis_params.n_neighbors),'\n']))
+			f.write(''.join(['# PCs:  ',str(self.analysis_params.n_pcs),'\n']))
+			f.write(''.join(['Spread:  ',str(self.analysis_params.spread),'\n']))
+			f.write(''.join(['Min Dist:  ',str(self.analysis_params.min_dist),'\n']))
+			f.write(''.join(['Resolution:  ',str(self.analysis_params.resolution),'\n']))
+			f.write(''.join(['BBKNN:  ',str(self.analysis_params.do_bbknn),'\n']))
+			f.write(''.join(['t-SNE:  ',str(self.analysis_params.do_tSNE),'\n']))
+
+		cell_counts_array = self.__cell_counter(self.adata, cat1='louvain', cat2='sampleName')
+		print(self.adata.obs['louvain'].cat.categories.to_list()+['total'])
+		print(self.adata.obs['sampleName'].cat.categories.to_list()+['total'])
+		cell_counts_df = pd.DataFrame(data=cell_counts_array, 
+									  index=self.adata.obs['louvain'].cat.categories.to_list()+['total'],
+									  columns=self.adata.obs['sampleName'].cat.categories.to_list()+['total'])
+
+		counts_filename = ''.join([figdir,'summary/cell_counts.csv'])
+		cell_counts_df.to_csv(counts_filename, sep=',')
+
+		if self.cell_score_lists:
+			cell_score_filename = ''.join([figdir,'summary/cell_scores.csv'])
+			cluster_score_array = self.__score_clusters(self.adata, self.gene_dict)
+			cell_score_df = pd.DataFrame(data=cluster_score_array,
+										 index=self.adata.obs['louvain'].cat.categories,
+										 columns=self.cell_score_lists)
+			cell_score_df.to_csv(cell_score_filename, sep=',')
+		return 0
+
+	## Count number of cells in each louvain cluster as well as the sample splits within each cluster
+	def __cell_counter(self, 
+					   adata, 
+					   cat1 = 'louvain', 
+					   cat2 = 'sampleName'):
+
+		cell_counts = np.zeros(shape=(len(adata.obs[cat1].cat.categories)+1,len(adata.obs[cat2].cat.categories)+1))
+
+		for i,field1 in enumerate(adata.obs[cat1].cat.categories):
+			for j,field2 in enumerate(adata.obs[cat2].cat.categories):
+				try:
+					cell_counts[i][j] = (adata.obs[cat1].isin([field1]) & adata.obs[cat2].isin([field2])).value_counts()[True]
+				except:
+					cell_counts[i][j] = 0
+
+				if i==0:
+					try:
+						cell_counts[len(adata.obs[cat1].cat.categories)][j] = adata.obs[cat2].isin([field2]).value_counts()[True]
+					except:
+						cell_counts[len(adata.obs[cat1].cat.categories)][j] = 0
+
+			try:
+				cell_counts[i][len(adata.obs[cat2].cat.categories)] = adata.obs[cat1].isin([field1]).value_counts()[True]
+			except:
+				cell_counts[i][len(adata.obs[cat2].cat.categories)] = 0
+
+		return cell_counts
+
+	## If doing cell scoring analysis, get average score per cluster given a gene scoring list name
+	def __score_clusters(self, adata, gene_dict):
+		cluster_scores = np.zeros(shape=(len(adata.obs['louvain'].cat.categories),len(self.cell_score_lists)))
+		for cluster in adata.obs['louvain'].cat.categories:
+			cluster_scores[int(cluster)] = adata[adata.obs['louvain'].isin([cluster])].obs[self.cell_score_lists].mean()
+
+		return cluster_scores
+
 	## ---DEPRECATED---
 	# Function that checks if an argument exists in a function and sets instance attributes based on them
 	def __set_param_attr(self,arg_dict):
@@ -203,6 +326,14 @@ class qc_params:
 	doublet_detection: bool=False
 
 @dataclass
+class pp_params:
+	'''
+	Preprocess Params DataClass --
+		combat: Run Combat batch correction across the specified metadata field
+	'''
+	combat: str='None'
+
+@dataclass
 class analysis_params:
 	'''
 	Analysis Params DataClass --
@@ -212,6 +343,8 @@ class analysis_params:
 		min_dist: Minimum distance between points on the umap graph
 		resolution: High resolution attempts to increases # of clusters identified
 		do_bbknn: Run batch balanced k-nearest neighbors batch correction algorithm
+		do_tSNE: Run tSNE clustering analysis
+		dpt: Run diffusion pseudotime analysis with input: ['metadata_cat','group']
 	'''
 	n_neighbors: int=30
 	n_pcs: int=15
@@ -220,6 +353,7 @@ class analysis_params:
 	resolution: float=0.6
 	do_bbknn: bool=False
 	do_tSNE: bool=False
+	dpt: List[str] = field(default_factory=lambda: ['louvain',['0']])
 
 @dataclass
 class plot_params:

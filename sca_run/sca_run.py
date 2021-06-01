@@ -48,9 +48,11 @@ class sca_run:
 		self.spread = 1
 		self.min_dist = 0.4
 		self.resolution = 0.6
-		self.remove_batch_effects = False
+		self.do_bbknn = False
 		self.do_tSNE = False
 		self.cell_score_lists = []
+		self.dpt = []
+		self.combat = False
 
 		## Plot Params
 		self.size = 20
@@ -93,7 +95,7 @@ class sca_run:
 		self.__set_param_attr(locals())
 
 	## Function to set multiple analysis parameters in attributes
-	def set_analysis_params(self, n_neighbors=30, n_pcs=15, spread=1, min_dist=0.4, resolution=0.6, remove_batch_effects=False, do_tSNE=False, cell_score_lists=[]):
+	def set_analysis_params(self, n_neighbors=30, n_pcs=15, spread=1, min_dist=0.4, resolution=0.6, do_bbknn=False, do_tSNE=False, cell_score_lists=[], dpt=[]):
 		self.__set_param_attr(locals())
 
 	## Function to set multiple plot parameters in attributes
@@ -156,7 +158,8 @@ class sca_run:
 		New filled AnnData object
 		'''
 		metadata_list = annotation_dict[sampleID][1:]
-		newAdata = sc.read_10x_h5(''.join([storage_mount_point, annotation_dict[sampleID][0]]))# genome='hg19' or genome='GRCh38'
+		print(''.join([storage_mount_point, annotation_dict[sampleID][0]]))
+		newAdata = sc.read_10x_h5(''.join([storage_mount_point, annotation_dict[sampleID][0]]))#,genome='GRCh38')# genome='hg19' or genome='GRCh38'
 
 		## Set gene names to be unique since there seem to be duplicate names from Cellranger
 		newAdata.var_names_make_unique()
@@ -515,14 +518,14 @@ class sca_run:
 			except:
 				print('\nUnable to save raw combined sample data to', raw_data_file,'\n')
 
-		#print(adata.var['genome'].values)
+		print(adata.var['genome'].values)
 
 		return adata
 
 	## Filters data based on certain parameters
 	# Attempts to remove "bad" data such as dead cells, doublets, etc.
 	def filter_data(self, adata, min_cells=None, min_genes=None, max_counts=None, max_genes=None, max_mito=None,
-					remove_batch_effects=None):
+					do_bbknn=None):
 		'''
 		Removes cells expressing low to no genes, and genes expressed in few to no cells
 		Filters out cells based on mitochondrial genes, UMI and max gene expression
@@ -625,6 +628,10 @@ class sca_run:
 		## Regress out effects of total reads per cell and the percentage of mitochondrial genes expressed.
 		sc.pp.regress_out(adata, ['n_counts','percent_mito'])
 
+		if self.combat:
+			print("Conducting combat batch correction")
+			sc.pp.combat(adata, key=self.combat)
+
 		self.adata_unscaled = adata.copy()
 
 		print('\nDoing, final filtering...\nKeeping', len(adata.obs_names),'cells and', len(adata.var_names),'genes.\n')
@@ -635,7 +642,7 @@ class sca_run:
 
 	## Run dimensional reduction analysis and clustering using KNN graph
 	def run_analysis(self,adata, n_neighbors=None, n_pcs=None, spread=None,
-					 min_dist=None, resolution=None, remove_batch_effects=None, do_tSNE=None):
+					 min_dist=None, resolution=None, do_bbknn=None, do_tSNE=None, dpt=None):
 		# If argument is None, set to instance attribute
 		param_dict = {k:(v if v else getattr(self,k)) for (k,v) in locals().items()}
 
@@ -666,7 +673,7 @@ class sca_run:
 
 		## Remove batch effects
 		# Note that doing this may override previous sc.pp.neighbors()
-		if param_dict['remove_batch_effects']:
+		if param_dict['do_bbknn']:
 			import bbknn
 			bbknn.bbknn(adata, batch_key='sampleName', copy=False)#, n_pcs=param_dict['n_pcs'], neighbors_within_batch=param_dict['n_neighbors'])
 			#sc.pp.external.mnn_correct(adata,batch_key='sampleName') # Testing another algorithm
@@ -680,6 +687,12 @@ class sca_run:
 
 		## Calculate cell clusters via Louvain algorithm
 		sc.tl.louvain(adata, resolution=param_dict['resolution'])
+
+		if self.dpt:
+			adata.uns['iroot'] = np.flatnonzero(adata.obs[self.dpt[0]].isin(self.dpt[1]))[0]
+			print(adata.uns['iroot'])
+			sc.tl.diffmap(adata)
+			sc.tl.dpt(adata, n_branchings=0, n_dcs=10)
 
 		## Run PAGA to predict non-directional cluster-cluster relationships to infer possible developmental progressions
 		sc.tl.paga(adata, groups='louvain', model='v1.2')
@@ -880,6 +893,12 @@ class sca_run:
 		# # Built in scanpy module
 		# sc.pl.violin(adata, genes_to_plot+['CDH5'], groupby='CDH5_exp', jitter=True,
 		# 	save='_feature.png', show=False, scale='width',use_raw=True) #order = ['CDH5+','CDH5-'],
+
+		if self.dpt:
+			sc.pl.diffmap(adata, color=['dpt_pseudotime', 'louvain'], size=self.size, show=False,
+						  save=''.join([self.dpt[0],'.png']))
+			sc.pl.umap(adata, color='dpt_pseudotime', size=self.size, show=False,
+					   save=''.join(['_','dpt','_',self.dpt[0],'.png']))
 		
 		# Custom violin plot module -- Not complete/in testing
 		df = pd.DataFrame()

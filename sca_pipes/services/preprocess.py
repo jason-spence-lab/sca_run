@@ -11,12 +11,13 @@ import numpy as np
 class preprocess:
 
 	def __init__(self, 
-				 gene_dict):
+				 gene_dict,
+				 pp_params):
 		'''
 		gene_dict: Dictionary of genes_lists to plot and score
 		'''
 		self.gene_dict = gene_dict
-
+		self.combat = pp_params.combat
 		self.adata_unscaled = None
 
 	## Standardize and normalize the data set
@@ -40,7 +41,7 @@ class preprocess:
 			adata_scaled = sc.pp.scale(adata, max_value=10, copy=True)
 			for key in self.gene_dict.keys():
 				if self.gene_dict[key].cell_score_list:
-					adata.obs[file] = adata_scaled.X[:,adata_scaled.var_names.isin(self.gene_dict[key].markers)].mean(1)
+					adata.obs[key] = adata_scaled.X[:,adata_scaled.var_names.isin(self.gene_dict[key].markers)].mean(1)
 
 		## Identify highly-variable genes based on dispersion relative to expression level
 		sc.pp.highly_variable_genes(adata, min_mean=0.0125, max_mean=3, min_disp=0.5)
@@ -50,6 +51,10 @@ class preprocess:
 
 		## Regress out effects of total reads per cell and the percentage of mitochondrial genes expressed.
 		sc.pp.regress_out(adata, ['n_counts','percent_mito'])
+
+		if not self.combat is 'None':
+			print("Conducting combat batch correction")
+			sc.pp.combat(adata, key=self.combat)
 
 		self.adata_unscaled = adata.copy()
 
