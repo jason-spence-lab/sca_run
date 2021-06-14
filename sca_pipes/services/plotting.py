@@ -31,7 +31,7 @@ class plotting:
 		'''
 		self.size = plot_params.size
 		self.umap_obs = plot_params.umap_obs
-		self.exp_grouping = plot_params.exp_grouping
+		self.dot_grouping = plot_params.dot_grouping
 		self.umap_categorical_color = plot_params.umap_categorical_color
 		self.umap_feature_color = plot_params.umap_feature_color
 		self.vmin_list = plot_params.vmin_list
@@ -158,7 +158,7 @@ class plotting:
 				groupby_positions = gene_obj.groupby_positions
 
 				if len(gene_obj.markers)!=0:
-					for grouping in self.exp_grouping:
+					for grouping in self.dot_grouping:
 						## Dotplot analysis
 						# Circle color corresponds to expression level, and circle size corresponds to percentage of cells expressing gene
 

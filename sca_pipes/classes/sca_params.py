@@ -164,7 +164,7 @@ class sca_params:
 	def set_plot_params(self,
 						size=20,
 						umap_obs=['louvain','sampleName'],
-						exp_grouping=['louvain'],
+						dot_grouping=['louvain'],
 						umap_categorical_color='default',
 						umap_feature_color='yellow_blue',
 						vmin_list=[],
@@ -176,7 +176,7 @@ class sca_params:
 		Plot Params -- 
 			size: Size of dots on all UMAP plots
 			umap_obs: Metadata observations by which to color UMAP plots
-			exp_grouping: Metadata observations by which to group dot plot rows
+			dot_grouping: Metadata observations by which to group dot plot rows
 			umap_categorical_color: List of colors for UMAP groups (HEX codes or RGB tuples)
 			umap_feature_color: Color scheme for UMAP gradient plots (yellow_blue or blue_orange)
 			vmin_list: List of y-axis minimums for cell scoring feature plots
@@ -188,7 +188,7 @@ class sca_params:
 
 		self.plot_params = plot_params(size=size,
 									   umap_obs=umap_obs,
-									   exp_grouping=exp_grouping,
+									   dot_grouping=dot_grouping,
 									   umap_categorical_color=umap_categorical_color,
 									   umap_feature_color=umap_feature_color,
 									   vmin_list=vmin_list,
@@ -361,7 +361,7 @@ class plot_params:
 	Plot Params DataClass --
 		size: Size of dots on all UMAP plots
 		umap_obs: Metadata observations by which to color UMAP plots
-		exp_grouping: Metadata observations by which to group dot plot rows
+		dot_grouping: Metadata observations by which to group dot plot rows
 		umap_categorical_color: List of colors for UMAP groups (HEX codes or RGB tuples)
 		umap_feature_color: Color scheme for UMAP gradient plots (yellow_blue or blue_orange)
 		vmin_list: List of y-axis minimums for cell scoring feature plots
@@ -372,7 +372,7 @@ class plot_params:
 	'''
 	size: int=20
 	umap_obs: List[str] = field(default_factory=lambda: ['louvain','sampleName'])
-	exp_grouping: List[str] = field(default_factory=lambda: ['louvain'])
+	dot_grouping: List[str] = field(default_factory=lambda: ['louvain'])
 	umap_categorical_color: List[str] = field(default_factory=lambda: ['default'])
 	umap_feature_color: str='yellow_blue'
 	vmin_list: List[int] = field(default_factory=list)

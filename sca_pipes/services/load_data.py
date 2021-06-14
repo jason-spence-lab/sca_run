@@ -93,7 +93,9 @@ class load_data:
 		New filled AnnData object
 		'''
 		metadata_list = annotation_dict[sampleID][1:]
-		newAdata = sc.read_10x_h5(''.join([storage_mount_point, annotation_dict[sampleID][0]]))#,genome='GRCh38')# genome='hg19' or genome='GRCh38'
+		file_path = ''.join([storage_mount_point, annotation_dict[sampleID][0]])
+
+		newAdata = sc.read_10x_h5(file_path)#,genome='GRCh38')# genome='hg19' or genome='GRCh38'
 
 		## Set gene names to be unique since there seem to be duplicate names from Cellranger
 		newAdata.var_names_make_unique()
@@ -105,7 +107,7 @@ class load_data:
 			meta_name = field_list[0]
 			meta_value = field_list[1]
 			newAdata.obs[meta_name] = meta_value
-		return(newAdata)
+		return newAdata.copy()
 
 
 	## Remove a specified list of genes from AnnData object
