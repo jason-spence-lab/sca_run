@@ -80,7 +80,7 @@ class SCARunner:
 					sca_params.annotation_dict = ld.annotation_dict
 
 				## Filter and process data
-				qc = quality_control.quality_control(sca_params.qc_params)
+				qc = quality_control.quality_control(sca_params.qc_params, sca_params.species)
 				adata = qc.run_qc(adata).copy()
 				sca_params.doublet_clf = qc.doublet_clf
 				sca_params.adata_preQC = qc.adata_preQC.copy()

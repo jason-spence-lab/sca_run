@@ -12,7 +12,7 @@ class quality_control:
 	'''
 	Service that quality controls raw single-cell data and filters out unwanted data points
 	'''
-	def __init__(self, qc_params):
+	def __init__(self, qc_params, species):
 		'''
 		min_cells: Filter out genes with a few number of cells
 		min_genes: Filter out cells with fewer genes to remove dead cells
@@ -27,6 +27,7 @@ class quality_control:
 		self.max_counts = qc_params.max_counts
 		self.max_mito = qc_params.max_mito
 		self.doublet_detection = qc_params.doublet_detection
+		self.species = species
 
 		self.doublet_clf = None
 		self.adata_preQC = None
@@ -54,7 +55,14 @@ class quality_control:
 
 		# Calculate the percent of genes derived from mito vs genome
 		# the `.A1` is only necessary as X is sparse (to transform to a dense array after summing)
-		mito_genes = adata.var_names.str.startswith('MT-')
+		if self.species=='human':
+			mito_genes = adata.var_names.str.startswith('MT-')
+		elif self.species=='mouse':
+			mito_genes = adata.var_names.str.startswith('mt-')
+		else:
+			print("No valid species name - assuming human")
+			mito_genes = adata.var_names.str.startswith('MT-')
+
 		try:
 			adata.obs['percent_mito'] = np.sum(adata[:,mito_genes].X, axis=1).A1 / np.sum(adata.X, axis=1).A1
 			# add the total counts per cell as observations-annotation to adata
