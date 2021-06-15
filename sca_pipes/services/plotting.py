@@ -108,7 +108,7 @@ class plotting:
 
 		## Plot results of UMAP dimensional reduction and clustering
 		for observation in self.umap_obs:
-			legend = 'on data' if (observation=='louvain') else 'right margin'
+			legend = 'on data' if (observation=='louvain' or 'leiden') else 'right margin'
 			sc.pl.umap(adata, color=observation, save=''.join(['_',observation,file_type]), show=False,
 					   legend_loc=legend, edges=False, size=size, palette=colors, alpha=0.75)
 
@@ -262,9 +262,16 @@ class plotting:
 
 		## Scatter plots to identify clusters that are high in number of genes, UMI counts, and mito transcript fraction
 		adata.obs['jitter'] = np.random.rand(len(adata.obs_names))*10
-		sc.pl.scatter(adata,x='jitter',y='n_genes',color='louvain',save='_n_genes.png',palette=colors,show=False)
-		sc.pl.scatter(adata,x='jitter',y='n_counts',color='louvain',save='_n_counts.png',palette=colors,show=False)
-		sc.pl.scatter(adata,x='jitter',y='percent_mito',color='louvain',save='_percent_mito.png',palette=colors,show=False)
+		sc.pl.scatter(adata,x='jitter',y='n_genes',color='louvain',save='_n_genes_louvain.png',palette=colors,show=False)
+		sc.pl.scatter(adata,x='jitter',y='n_counts',color='louvain',save='_n_counts_louvain.png',palette=colors,show=False)
+		sc.pl.scatter(adata,x='jitter',y='percent_mito',color='louvain',save='_percent_mito_louvain.png',palette=colors,show=False)
+
+		if sca_params.analysis_params.do_leiden:
+			sc.pl.scatter(adata,x='jitter',y='n_genes',color='leiden',save='_n_genes_leiden.png',palette=colors,show=False)
+		    sc.pl.scatter(adata,x='jitter',y='n_counts',color='leiden',save='_n_counts_leiden.png',palette=colors,show=False)
+		    sc.pl.scatter(adata,x='jitter',y='percent_mito',color='leiden',save='_percent_mito_leiden.png',palette=colors,show=False)
+
+
 
 		sc.pl.umap(adata,color=['n_genes','n_counts','percent_mito'],color_map=my_feature_cmap,save='_counts_check.png',show=False)
 

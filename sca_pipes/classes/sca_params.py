@@ -133,6 +133,7 @@ class sca_params:
 							resolution=0.6,
 							do_bbknn=False,
 							do_tSNE=False,
+							do_leiden=False,
 							dpt=[]):
 		'''
 		Analysis Params --
@@ -153,6 +154,7 @@ class sca_params:
 											   resolution=resolution,
 											   do_bbknn=do_bbknn,
 											   do_tSNE=do_tSNE,
+											   do_leiden=do_leiden,
 											   dpt=dpt)
 		return
 
@@ -163,13 +165,13 @@ class sca_params:
 	## Creates object containing all of the plotting parameters and sets as attribute
 	def set_plot_params(self,
 						size=20,
-						umap_obs=['louvain','sampleName'],
-						dot_grouping=['louvain'],
+						umap_obs=['louvain','sampleName','leiden'],
+						dot_grouping=['louvain','leiden'],
 						umap_categorical_color='default',
 						umap_feature_color='yellow_blue',
 						vmin_list=[],
 						vmax_list=[],
-						rank_grouping=['louvain'],
+						rank_grouping=['louvain','leiden'],
 						clusters2_compare = ['all'],
 						final_quality = False):
 		'''
@@ -244,6 +246,7 @@ class sca_params:
 			f.write(''.join(['Resolution:  ',str(self.analysis_params.resolution),'\n']))
 			f.write(''.join(['BBKNN:  ',str(self.analysis_params.do_bbknn),'\n']))
 			f.write(''.join(['t-SNE:  ',str(self.analysis_params.do_tSNE),'\n']))
+			f.write(''.join(['leiden clustering:  ',str(self.analysis_params.do_leiden),'\n']))
 
 		cell_counts_array = self.__cell_counter(self.adata, cat1='louvain', cat2='sampleName')
 		print(self.adata.obs['louvain'].cat.categories.to_list()+['total'])
@@ -353,6 +356,7 @@ class analysis_params:
 	resolution: float=0.6
 	do_bbknn: bool=False
 	do_tSNE: bool=False
+	do_leiden: bool=False
 	dpt: List[str] = field(default_factory=lambda: ['louvain',['0']])
 
 @dataclass
@@ -371,13 +375,13 @@ class plot_params:
 		final_quality: Makes high resolution figures in pdf
 	'''
 	size: int=20
-	umap_obs: List[str] = field(default_factory=lambda: ['louvain','sampleName'])
-	dot_grouping: List[str] = field(default_factory=lambda: ['louvain'])
+	umap_obs: List[str] = field(default_factory=lambda: ['louvain','sampleName','leiden'])
+	dot_grouping: List[str] = field(default_factory=lambda: ['louvain','leiden'])
 	umap_categorical_color: List[str] = field(default_factory=lambda: ['default'])
 	umap_feature_color: str='yellow_blue'
 	vmin_list: List[int] = field(default_factory=list)
 	vmax_list: List[int] = field(default_factory=list)
-	rank_grouping: List[str] = field(default_factory=lambda: ['louvain'])
+	rank_grouping: List[str] = field(default_factory=lambda: ['louvain','leiden'])
 	clusters2_compare: List[str] = field(default_factory=lambda: ['all'])
 	final_quality: bool=False
 

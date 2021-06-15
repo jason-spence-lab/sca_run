@@ -30,6 +30,7 @@ class tools:
 		self.resolution = analysis_params.resolution
 		self.do_bbknn = analysis_params.do_bbknn
 		self.do_tSNE = analysis_params.do_tSNE
+		self.do_leiden = analysis_params.do_leiden
 		self.dpt = analysis_params.dpt
 
 	## Run dimensional reduction analysis and clustering using KNN graph
@@ -59,9 +60,11 @@ class tools:
 		if self.do_tSNE:
 			sc.tl.tsne(adata, n_pcs=self.n_pcs)
 
+		if self.do_leiden:
+			sc.tl.leiden(adata, resolution=self.resolution, key_added='leiden')
+
 		## Calculate cell clusters via louvain algorithm
 		sc.tl.louvain(adata, resolution=self.resolution)
-		# sc.external.tl.phate(adata)
 
 		if self.dpt:
 			adata.uns['iroot'] = np.flatnonzero(adata.obs[self.dpt[0]].isin(self.dpt[1]))[0]
