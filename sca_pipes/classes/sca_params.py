@@ -144,6 +144,7 @@ class sca_params:
 			resolution: High resolution attempts to increases # of clusters identified
 			do_bbknn: Run batch balanced k-nearest neighbors batch correction algorithm
 			do_tSNE: Run tSNE dimensional reduction analysis
+			do_leiden: Run leiden clustering besides louvain clustering 
 			dpt: Run diffusion pseudotime analysis with input: ['metadata_cat','group']
 		'''
 
@@ -247,7 +248,8 @@ class sca_params:
 			f.write(''.join(['BBKNN:  ',str(self.analysis_params.do_bbknn),'\n']))
 			f.write(''.join(['t-SNE:  ',str(self.analysis_params.do_tSNE),'\n']))
 			f.write(''.join(['leiden clustering:  ',str(self.analysis_params.do_leiden),'\n']))
-
+        
+        # need to update with leiden option
 		cell_counts_array = self.__cell_counter(self.adata, cat1='louvain', cat2='sampleName')
 		print(self.adata.obs['louvain'].cat.categories.to_list()+['total'])
 		print(self.adata.obs['sampleName'].cat.categories.to_list()+['total'])
@@ -267,7 +269,7 @@ class sca_params:
 			cell_score_df.to_csv(cell_score_filename, sep=',')
 		return 0
 
-	## Count number of cells in each louvain cluster as well as the sample splits within each cluster
+	## Count number of cells in each louvain cluster as well as the sample splits within each cluster, need to update with leiden option
 	def __cell_counter(self, 
 					   adata, 
 					   cat1 = 'louvain', 
