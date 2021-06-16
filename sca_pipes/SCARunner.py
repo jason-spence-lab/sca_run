@@ -72,8 +72,8 @@ class SCARunner:
 					adata = adata_loaded.copy()
 				else:
 					ld = load_data.load_data(storage_mount_point = sca_params.storage_mount_point,
-										     sample_list = sca_params.sample_list,
-										     remove_genes = remove_genes)
+											 sample_list = sca_params.sample_list,
+											 remove_genes = remove_genes)
 					adata = ld.load().copy()
 					sca_params.initial_cell_count = ld.initial_cell_count
 					sca_params.initial_gene_count = ld.initial_gene_count
