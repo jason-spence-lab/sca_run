@@ -115,7 +115,7 @@ class SCARunner:
 
 	## Pipeline for analysis in which you extract interesting clusters/observations after an initial run
 	# Extracts clusters to an filtered but unprocessed AnnData object, then reprocesses and reclusters
-	def pipe_ext(self, sca_params, extracted, figdir='./figures/', load_save=None, new_save='adata_save.p', label='',
+	def pipe_ext(self, sca_params, extracted, figdir='./figures/', load_save=None, new_save='extracted_adata_save.p', label='',
 				 no_preprocess=False):
 		'''
 		Allows loading of a saved pickle adata file, file must contained adata that has gone through a complete pipeline

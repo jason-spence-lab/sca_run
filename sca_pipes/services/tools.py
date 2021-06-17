@@ -21,6 +21,7 @@ class tools:
 			resolution: High resolution attempts to increases # of clusters identified
 			do_bbknn: Run batch balanced k-nearest neighbors batch correction algorithm
 			do_tSNE: Run tSNE dimensional reduction analysis
+			do_leiden: Run leiden clustering besides louvain clustering
 			dpt: Run diffusion pseudotime analysis with input: ['metadata_cat','group']
 		'''
 		self.n_neighbors = analysis_params.n_neighbors
@@ -40,7 +41,7 @@ class tools:
 		sc.tl.pca(adata, svd_solver='arpack')
 
 		## Save the existing data to disk for later
-		self.adata_postPCA = adata.copy()
+		## self.adata_postPCA = adata.copy()
 
 		## Remove batch effects
 		# Note that doing this may override previous sc.pp.neighbors()

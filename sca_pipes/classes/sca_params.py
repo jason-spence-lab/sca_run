@@ -305,12 +305,6 @@ class sca_params:
 
 		return cluster_scores
 
-	## ---DEPRECATED---
-	# Function that checks if an argument exists in a function and sets instance attributes based on them
-	def __set_param_attr(self,arg_dict):
-		for key in arg_dict:
-			if key != 'self':
-				setattr(self,key,arg_dict[key])
 
 @dataclass
 class qc_params:
