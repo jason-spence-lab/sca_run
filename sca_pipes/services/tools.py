@@ -21,7 +21,7 @@ class tools:
 			resolution: High resolution attempts to increases # of clusters identified
 			do_bbknn: Run batch balanced k-nearest neighbors batch correction algorithm
 			do_tSNE: Run tSNE dimensional reduction analysis
-			do_leiden: Run leiden clustering besides louvain clustering
+			clustering_choice: Run leiden clustering or louvain clustering based on user's choice
 			dpt: Run diffusion pseudotime analysis with input: ['metadata_cat','group']
 		'''
 		self.n_neighbors = analysis_params.n_neighbors
@@ -31,7 +31,7 @@ class tools:
 		self.resolution = analysis_params.resolution
 		self.do_bbknn = analysis_params.do_bbknn
 		self.do_tSNE = analysis_params.do_tSNE
-		self.do_leiden = analysis_params.do_leiden
+		self.clustering_choice = analysis_params.clustering_choice
 		self.dpt = analysis_params.dpt
 
 	## Run dimensional reduction analysis and clustering using KNN graph
@@ -61,11 +61,8 @@ class tools:
 		if self.do_tSNE:
 			sc.tl.tsne(adata, n_pcs=self.n_pcs)
 
-		if self.do_leiden:
-			sc.tl.leiden(adata, resolution=self.resolution, key_added='leiden')
-
-		## Calculate cell clusters via louvain algorithm
-		sc.tl.louvain(adata, resolution=self.resolution)
+		## Calculate cell clusters via the chosen clustering algorithm
+		getattr(sc.tl, self.clustering_choice)(adata, resolution=self.resolution)
 
 		if self.dpt:
 			adata.uns['iroot'] = np.flatnonzero(adata.obs[self.dpt[0]].isin(self.dpt[1]))[0]
@@ -74,8 +71,8 @@ class tools:
 			sc.tl.dpt(adata, n_branchings=0, n_dcs=10)
 
 		## Run PAGA to predict non-directional cluster-cluster relationships to infer possible developmental progressions
-		sc.tl.paga(adata, groups='louvain', model='v1.2')
+		sc.tl.paga(adata, groups=self.clustering_choice, model='v1.2')
 
 		## Do Dendrogram analysis based on PCs
-		sc.tl.dendrogram(adata, groupby='louvain', n_pcs=self.n_pcs, linkage_method="median", use_raw=True)
+		sc.tl.dendrogram(adata, groupby=self.clustering_choice, n_pcs=self.n_pcs, linkage_method="median", use_raw=True)
 		return adata
