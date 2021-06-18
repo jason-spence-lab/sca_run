@@ -29,7 +29,9 @@ class load_data:
 		The raw data folder contains folders of sample runs as well as the meta-data table
 		'''
 		print("Loading data into AnnData object")
-
+        
+        ## add raw data file directory if it doesn't exist
+        os.makedirs(os.path.dirname('./data/'), exist_ok=True)
 		## Location to output the anndata h5ad files
 		raw_data_file = ''.join(['./data/Data_','_'.join(self.sample_list),
 		                         '.scanpy.raw.h5ad'])  # the file that will store the raw combined data
