@@ -322,9 +322,9 @@ class plotting:
         return cmap
 
     ## Writes results of rank genes analysis to multiple csv files, each representing a cluster
-    def __rank_genes(self,adata, groupby, clusters2_compare=None, figdir='./figures/'):
+    def __rank_genes(self, adata, rank_grouping, clusters2_compare=None, figdir='./figures/'):
         '''
-        groupby: Adata observation metadata categories to compare
+        rank_grouping: Adata observation metadata categories to compare
         clusters2_compare: Selection of either 2 clusters to compare - if none, then do 1vAll comparison
 
         Need to add file clearing
@@ -335,23 +335,23 @@ class plotting:
             return 0 # Functionality not available yet
         elif clusters2_compare == None: # Do default 1vAll comparison
             print("No clusters selected for comparison. Doing default 1vAll comparison")
-            sc.tl.rank_genes_groups(adata,groupby ,method='t-test', rankby_abs=False, n_genes=200)
-            self.__write_rank_genes(adata, groupby, clusters2_compare, figdir)
+            sc.tl.rank_genes_groups(adata,rank_grouping ,method='t-test', rankby_abs=False, n_genes=200)
+            self.__write_rank_genes(adata, rank_grouping, clusters2_compare, figdir)
         else: # Compare 
-            adata_temp = adata[adata.obs[sca_params.analysis_params.clustering_choice].isin(clusters2_compare)]
-            sc.tl.rank_genes_groups(adata_temp, groupby, method='t-test', n_genes=200)
-            self.__write_rank_genes(adata_temp, groupby, clusters2_compare, figdir)
+            adata_temp = adata[adata.obs[rank_grouping].isin(clusters2_compare)]
+            sc.tl.rank_genes_groups(adata_temp, rank_grouping, method='t-test', n_genes=200)
+            self.__write_rank_genes(adata_temp, rank_grouping, clusters2_compare, figdir)
         return 0
 
     ## Actually does the writing to csv files of the rank genes analysis
-    def __write_rank_genes(self,adata, groupby, clusters2_compare, figdir='./figures/'):
+    def __write_rank_genes(self,adata, rank_grouping, clusters2_compare, figdir='./figures/'):
         rank_genes_data = copy.deepcopy(adata.uns['rank_genes_groups']) # create copy of data to manipulate
         rank_genes_data.pop('params')
         if clusters2_compare == None:
             clusters2_compare=['all']
 
-        for cluster in adata.obs[groupby].cat.categories:
-            csv_fileName = '/'.join([figdir,'csv_files','_'.join([groupby]+clusters2_compare),
+        for cluster in adata.obs[rank_grouping].cat.categories:
+            csv_fileName = '/'.join([figdir,'csv_files','_'.join([rank_grouping]+clusters2_compare),
                 '_'.join([cluster,'compare.csv'])])
             os.makedirs(os.path.dirname(csv_fileName), exist_ok=True) # Make file if it doesn't exist already
             with open(csv_fileName,'w',newline='') as f:
