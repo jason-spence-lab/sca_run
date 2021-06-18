@@ -329,11 +329,7 @@ class plotting:
 
         Need to add file clearing
         '''
-
-        if clusters2_compare == 'All': # Does 1 to 1 comparison between of all of the clusters
-            print("Functionality not developed yet")
-            return 0 # Functionality not available yet
-        elif clusters2_compare == None: # Do default 1vAll comparison
+        if clusters2_compare == None: # Do default 1vAll comparison
             print("No clusters selected for comparison. Doing default 1vAll comparison")
             sc.tl.rank_genes_groups(adata,rank_grouping ,method='t-test', rankby_abs=False, n_genes=200)
             self.__write_rank_genes(adata, rank_grouping, clusters2_compare, figdir)
