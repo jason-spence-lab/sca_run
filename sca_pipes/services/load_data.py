@@ -31,9 +31,9 @@ class load_data:
 		print("Loading data into AnnData object")
 
 		## Location to output the anndata h5ad files
-		raw_data_file = ''.join(['/Users/zhiweixiao/Documents/single_cell_data/data-','_'.join(self.sample_list),
+		raw_data_file = ''.join(['./data/Data_','_'.join(self.sample_list),
 		                         '.scanpy.raw.h5ad'])  # the file that will store the raw combined data
-		results_file = ''.join(['/Users/zhiweixiao/Documents/single_cell_data/data-','_'.join(self.sample_list),
+		results_file = ''.join(['./data/Data_','_'.join(self.sample_list),
 		                        '.processed.h5ad'])  # the file that will store the analysis results
 
 		## Creates a dictionary with sample id key, data file location, and relevant metadata
@@ -49,7 +49,7 @@ class load_data:
 
 		## Read the raw Cellranger filtered data matrices into new Anndata objects
 		if Path(raw_data_file).is_file():
-			print(''.join(['data-','_'.join(self.sample_list),'.scanpy.raw.h5ad']),'found, using this existing raw data file\n')
+			print(''.join(['Data_','_'.join(self.sample_list),'.scanpy.raw.h5ad']),'found, using this existing raw data file\n')
 			adata = sc.read_h5ad(raw_data_file)
 		else:
 			print('\nNo existing h5ad raw data file found, reading in 10x h5 data for each sample\n')
