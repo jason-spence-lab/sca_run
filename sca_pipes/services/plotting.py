@@ -108,7 +108,7 @@ class plotting:
 
         ## Plot results of UMAP dimensional reduction and clustering
         for observation in self.umap_obs:
-            legend = 'right margin' if (observation=='sampleName') else 'on data'
+            legend = 'on data' if (observation==sca_params.analysis_params.clustering_choice) else 'right margin'
             sc.pl.umap(adata, color=observation, save=''.join(['_',observation,file_type]), show=False,
                        legend_loc=legend, edges=False, size=size, palette=colors, alpha=0.75)
 
