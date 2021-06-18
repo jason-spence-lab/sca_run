@@ -146,7 +146,7 @@ class SCARunner:
 
 			if not no_preprocess:
 				## Create an unprocessed AnnData object with the desired clusters
-				adata_ext = sca_params.adata_postQC[adata.obs['louvain'].isin(extracted)].copy()
+				adata_ext = sca_params.adata_postQC[adata.obs[sca_params.analysis_params.clustering_choice].isin(extracted)].copy()
 				sca_params.adata_postQC = adata_ext.copy()
 
 				## Reprocess and recluster extracted cells
@@ -154,8 +154,8 @@ class SCARunner:
 				adata_ext = pp.run_preprocess(adata_ext)
 				sca_params.adata_unscaled = pp.adata_unscaled.copy()
 			else:
-				sca_params.adata_postQC = sca_params.adata_postQC[adata.obs['louvain'].isin(extracted)].copy()
-				adata_ext = sca_params.adata[adata.obs['louvain'].isin(extracted)].copy()
+				sca_params.adata_postQC = sca_params.adata_postQC[adata.obs[sca_params.analysis_params.clustering_choice].isin(extracted)].copy()
+				adata_ext = sca_params.adata[adata.obs[sca_params.analysis_params.clustering_choice].isin(extracted)].copy()
 		else:
 			print(extracted, "is not a valid input")
 			return

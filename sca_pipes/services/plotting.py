@@ -67,7 +67,7 @@ class plotting:
         gray_cmap = self.make_cmap([(220,220,220),(220,220,220)], bit=True)
 
 
-        ## Check to see if user specified a color palette for categorical umap plots, ie. louvain, obs_fields
+        ## Check to see if user specified a color palette for categorical umap plots, ie. leiden, obs_fields
         if self.umap_categorical_color=='default':
             ## Custom color palette for cluster plots and observation plots
             colors = [(1,0.5,0),(0.5,0.5,0.85),(0,1,0),(1,0,0),(0,0,0.9),(0,1,1),
@@ -117,7 +117,7 @@ class plotting:
                             legend_loc=legend, edges=False, size=size, palette=colors, alpha=0.75)
         # sc.external.pl.phate(adata,gene_symbols=['CAV1','LY6D','KRT4','TP63','CDH1'], use_raw=True, color_map=my_feature_cmap,
         #                    save='phate.png', size=size)
-        ## Find marker genes via Wilxocon test based on louvain cluster assignment
+        ## Find marker genes via Wilxocon test based on cluster assignment
         # Create a simple plot to show the top 25 most significant markers for each cluster
         # Write most significant markers to a csv file
         for rank_grouping in self.rank_grouping:        
@@ -167,7 +167,8 @@ class plotting:
                         dendrogram=False
                         if groupby_positions:
                             dendrogram = False
-                            adata_plots.obs['louvain'] = adata.obs['louvain'].cat.reorder_categories(groupby_positions,inplace = False)
+                            clustering_chosen = sca_params.analysis_params.clustering_choice
+                            adata_plots.obs[clustering_chosen]=adata.obs[clustering_chosen].cat.reorder_categories(groupby_positions,inplace = False)
 
                         sc.pl.dotplot(adata_plots, genes_to_plot, groupby=grouping, 
                                 var_group_positions=feature_positions, var_group_labels=feature_groups,
@@ -181,6 +182,7 @@ class plotting:
                                 cmap=my_feature_cmap, use_raw=True)
 
         # Genes that are not expressed or are invariable are plotted using a grayscale
+        sca_params.missing_genes = missing_genes
         print('Plotting empty genes: ',missing_genes,'\n')
         empty_genes = [gene for gene in missing_genes if (gene in adata.raw.var_names)]
         genes_noseq = [gene for gene in missing_genes if (gene not in empty_genes)]
@@ -225,7 +227,7 @@ class plotting:
                          jitter=0.4, save='_cell_scores.png',show=False,multi_panel=True,rotation=90)
 
         if sca_params.analysis_params.dpt:
-            sc.pl.diffmap(adata, color=['dpt_pseudotime', 'louvain'], size=self.size, show=False,
+            sc.pl.diffmap(adata, color=['dpt_pseudotime', sca_params.analysis_params.clustering_choice], size=self.size, show=False,
                           save=''.join([sca_params.analysis_params.dpt[0],'.png']))
             sc.pl.umap(adata, color='dpt_pseudotime', size=self.size, show=False,
                        save=''.join(['_','dpt','_',sca_params.analysis_params.dpt[0],'.png']))
@@ -262,14 +264,10 @@ class plotting:
 
         ## Scatter plots to identify clusters that are high in number of genes, UMI counts, and mito transcript fraction
         adata.obs['jitter'] = np.random.rand(len(adata.obs_names))*10
-        sc.pl.scatter(adata,x='jitter',y='n_genes',color='louvain',save='_n_genes_louvain.png',palette=colors,show=False)
-        sc.pl.scatter(adata,x='jitter',y='n_counts',color='louvain',save='_n_counts_louvain.png',palette=colors,show=False)
-        sc.pl.scatter(adata,x='jitter',y='percent_mito',color='louvain',save='_percent_mito_louvain.png',palette=colors,show=False)
-        
-        if sca_params.analysis_params.do_leiden:
-            sc.pl.scatter(adata,x='jitter',y='n_genes',color='leiden',save='_n_genes_leiden.png',palette=colors,show=False)
-            sc.pl.scatter(adata,x='jitter',y='n_counts',color='leiden',save='_n_counts_leiden.png',palette=colors,show=False)
-            sc.pl.scatter(adata,x='jitter',y='percent_mito',color='leiden',save='_percent_mito_leiden.png',palette=colors,show=False)
+        sc.pl.scatter(adata,x='jitter',y='n_genes',color=sca_params.analysis_params.clustering_choice,save='_n_genes.png',palette=colors,show=False)
+        sc.pl.scatter(adata,x='jitter',y='n_counts',color=sca_params.analysis_params.clustering_choice,save='_n_counts.png',palette=colors,show=False)
+        sc.pl.scatter(adata,x='jitter',y='percent_mito',color=sca_params.analysis_params.clustering_choice,save='_percent_mito.png',palette=colors,show=False)
+    
 
         sc.pl.umap(adata,color=['n_genes','n_counts','percent_mito'],color_map=my_feature_cmap,save='_counts_check.png',show=False)
 
@@ -323,7 +321,7 @@ class plotting:
         cmap = mpl.colors.LinearSegmentedColormap('my_colormap',cdict,256)
         return cmap
 
-    ## Writes results of rank genes analysis to multiple csv files, each representing a louvain cluster
+    ## Writes results of rank genes analysis to multiple csv files, each representing a cluster
     def __rank_genes(self,adata, groupby, clusters2_compare=None, figdir='./figures/'):
         '''
         groupby: Adata observation metadata categories to compare
@@ -340,7 +338,7 @@ class plotting:
             sc.tl.rank_genes_groups(adata,groupby ,method='t-test', rankby_abs=False, n_genes=200)
             self.__write_rank_genes(adata, groupby, clusters2_compare, figdir)
         else: # Compare 
-            adata_temp = adata[adata.obs['louvain'].isin(clusters2_compare)]
+            adata_temp = adata[adata.obs[sca_params.analysis_params.clustering_choice].isin(clusters2_compare)]
             sc.tl.rank_genes_groups(adata_temp, groupby, method='t-test', n_genes=200)
             self.__write_rank_genes(adata_temp, groupby, clusters2_compare, figdir)
         return 0

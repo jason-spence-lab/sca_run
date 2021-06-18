@@ -20,7 +20,7 @@ class sca_params:
 	'''
 
 	def __init__(self):
-		self.storage_mount_point = 'Z:/'
+		self.storage_mount_point = '/Volumes/mcomm-spencelab/'
 		self.species = 'human'
 		self.sample_list = []
 		self.gene_lists = [] 
@@ -39,6 +39,7 @@ class sca_params:
 		self.final_cell_count = None
 		self.final_gene_count = None
 		self.annotation_dict = dict()
+		self.missing_genes = None
 
 		## adata
 		self.adata = None
@@ -130,10 +131,10 @@ class sca_params:
 							n_pcs=15,
 							spread=1,
 							min_dist=0.4,
-							resolution=0.6,
+							resolution=0.4,
 							do_bbknn=False,
 							do_tSNE=False,
-							do_leiden=False,
+							clustering_choice="leiden",
 							dpt=[]):
 		'''
 		Analysis Params --
@@ -144,7 +145,7 @@ class sca_params:
 			resolution: High resolution attempts to increases # of clusters identified
 			do_bbknn: Run batch balanced k-nearest neighbors batch correction algorithm
 			do_tSNE: Run tSNE dimensional reduction analysis
-			do_leiden: Run leiden clustering besides louvain clustering 
+			clustering_choice: Run leiden clustering or louvain clustering based on user's choice. Default is leiden clustering 
 			dpt: Run diffusion pseudotime analysis with input: ['metadata_cat','group']
 		'''
 
@@ -155,7 +156,7 @@ class sca_params:
 											   resolution=resolution,
 											   do_bbknn=do_bbknn,
 											   do_tSNE=do_tSNE,
-											   do_leiden=do_leiden,
+											   clustering_choice=clustering_choice,
 											   dpt=dpt)
 		return
 
@@ -166,13 +167,13 @@ class sca_params:
 	## Creates object containing all of the plotting parameters and sets as attribute
 	def set_plot_params(self,
 						size=20,
-						umap_obs=['louvain','sampleName','leiden'],
-						dot_grouping=['louvain','leiden'],
+						umap_obs=['sampleName','leiden'],
+						dot_grouping=['sampleName','leiden'],
 						umap_categorical_color='default',
 						umap_feature_color='yellow_blue',
 						vmin_list=[],
 						vmax_list=[],
-						rank_grouping=['louvain','leiden'],
+						rank_grouping=['leiden'],
 						clusters2_compare = ['all'],
 						final_quality = False):
 		'''
@@ -230,6 +231,7 @@ class sca_params:
 			f.write(''.join(['Final cell count:  ',str(self.final_cell_count),'\n']))
 			f.write(''.join(['Initial gene count:  ',str(self.initial_gene_count),'\n']))
 			f.write(''.join(['Final gene count:  ',str(self.final_gene_count),'\n']))
+			f.write(''.join(['Empty genes:  ',str(self.missing_genes),'\n']))
 
 			f.write('\n--------Quality Control Parameters Used--------\n')
 			f.write(''.join(['Min Cells:  ',str(self.qc_params.min_cells),'\n']))
@@ -247,14 +249,14 @@ class sca_params:
 			f.write(''.join(['Resolution:  ',str(self.analysis_params.resolution),'\n']))
 			f.write(''.join(['BBKNN:  ',str(self.analysis_params.do_bbknn),'\n']))
 			f.write(''.join(['t-SNE:  ',str(self.analysis_params.do_tSNE),'\n']))
-			f.write(''.join(['leiden clustering:  ',str(self.analysis_params.do_leiden),'\n']))
+			f.write(''.join(['Clustering Choice:  ',str(self.analysis_params.clustering_choice),'\n']))
         
-        # need to update with leiden option
-		cell_counts_array = self.__cell_counter(self.adata, cat1='louvain', cat2='sampleName')
-		print(self.adata.obs['louvain'].cat.categories.to_list()+['total'])
+        
+		cell_counts_array = self.__cell_counter(self.adata, cat1=self.analysis_params.clustering_choice, cat2='sampleName')
+		print(self.adata.obs[self.analysis_params.clustering_choice].cat.categories.to_list()+['total'])
 		print(self.adata.obs['sampleName'].cat.categories.to_list()+['total'])
 		cell_counts_df = pd.DataFrame(data=cell_counts_array, 
-									  index=self.adata.obs['louvain'].cat.categories.to_list()+['total'],
+									  index=self.adata.obs[self.analysis_params.clustering_choice].cat.categories.to_list()+['total'],
 									  columns=self.adata.obs['sampleName'].cat.categories.to_list()+['total'])
 
 		counts_filename = ''.join([figdir,'summary/cell_counts.csv'])
@@ -262,17 +264,17 @@ class sca_params:
 
 		if self.cell_score_lists:
 			cell_score_filename = ''.join([figdir,'summary/cell_scores.csv'])
-			cluster_score_array = self.__score_clusters(self.adata, self.gene_dict)
+			cluster_score_array = self.__score_clusters(self.adata, self.gene_dict,clustering_choice = self.analysis_params.clustering_choice)
 			cell_score_df = pd.DataFrame(data=cluster_score_array,
-										 index=self.adata.obs['louvain'].cat.categories,
+										 index=self.adata.obs[self.analysis_params.clustering_choice].cat.categories,
 										 columns=self.cell_score_lists)
 			cell_score_df.to_csv(cell_score_filename, sep=',')
 		return 0
 
-	## Count number of cells in each louvain cluster as well as the sample splits within each cluster, need to update with leiden option
+	## Count number of cells in each cluster as well as the sample splits within each cluster
 	def __cell_counter(self, 
 					   adata, 
-					   cat1 = 'louvain', 
+					   cat1 = 'leiden', 
 					   cat2 = 'sampleName'):
 
 		cell_counts = np.zeros(shape=(len(adata.obs[cat1].cat.categories)+1,len(adata.obs[cat2].cat.categories)+1))
@@ -298,10 +300,10 @@ class sca_params:
 		return cell_counts
 
 	## If doing cell scoring analysis, get average score per cluster given a gene scoring list name
-	def __score_clusters(self, adata, gene_dict):
-		cluster_scores = np.zeros(shape=(len(adata.obs['louvain'].cat.categories),len(self.cell_score_lists)))
-		for cluster in adata.obs['louvain'].cat.categories:
-			cluster_scores[int(cluster)] = adata[adata.obs['louvain'].isin([cluster])].obs[self.cell_score_lists].mean()
+	def __score_clusters(self, adata, gene_dict,clustering_choice = 'leiden'):
+		cluster_scores = np.zeros(shape=(len(adata.obs[clustering_choice].cat.categories),len(self.cell_score_lists)))
+		for cluster in adata.obs[clustering_choice].cat.categories:
+			cluster_scores[int(cluster)] = adata[adata.obs[clustering_choice].isin([cluster])].obs[self.cell_score_lists].mean()
 
 		return cluster_scores
 
@@ -343,17 +345,18 @@ class analysis_params:
 		resolution: High resolution attempts to increases # of clusters identified
 		do_bbknn: Run batch balanced k-nearest neighbors batch correction algorithm
 		do_tSNE: Run tSNE clustering analysis
+		clustering_choice: Run leiden clustering or louvain clustering based on user's choice
 		dpt: Run diffusion pseudotime analysis with input: ['metadata_cat','group']
 	'''
 	n_neighbors: int=30
 	n_pcs: int=15
 	spread: int=1
 	min_dist: float=0.4
-	resolution: float=0.6
+	resolution: float=0.4
 	do_bbknn: bool=False
 	do_tSNE: bool=False
-	do_leiden: bool=False
-	dpt: List[str] = field(default_factory=lambda: ['louvain',['0']])
+	clustering_choice: str="leiden"
+	dpt: List[str] = field(default_factory=lambda: ['leiden',['0']])
 
 @dataclass
 class plot_params:
@@ -371,13 +374,13 @@ class plot_params:
 		final_quality: Makes high resolution figures in pdf
 	'''
 	size: int=20
-	umap_obs: List[str] = field(default_factory=lambda: ['louvain','sampleName','leiden'])
-	dot_grouping: List[str] = field(default_factory=lambda: ['louvain','leiden'])
+	umap_obs: List[str] = field(default_factory=lambda: ['sampleName','leiden'])
+	dot_grouping: List[str] = field(default_factory=lambda: ['sampleName','leiden'])
 	umap_categorical_color: List[str] = field(default_factory=lambda: ['default'])
 	umap_feature_color: str='yellow_blue'
 	vmin_list: List[int] = field(default_factory=list)
 	vmax_list: List[int] = field(default_factory=list)
-	rank_grouping: List[str] = field(default_factory=lambda: ['louvain','leiden'])
+	rank_grouping: List[str] = field(default_factory=lambda: ['leiden'])
 	clusters2_compare: List[str] = field(default_factory=lambda: ['all'])
 	final_quality: bool=False
 
