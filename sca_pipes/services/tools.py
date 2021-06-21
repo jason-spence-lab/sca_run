@@ -21,7 +21,7 @@ class tools:
 			resolution: High resolution attempts to increases # of clusters identified
 			do_bbknn: Run batch balanced k-nearest neighbors batch correction algorithm
 			do_tSNE: Run tSNE dimensional reduction analysis
-			clustering_choice: Run leiden clustering or louvain clustering based on user's choice
+			clustering_choice: Run leiden clustering or louvain clustering based on user's choice. Default is leiden clustering 
 			dpt: Run diffusion pseudotime analysis with input: ['metadata_cat','group']
 		'''
 		self.n_neighbors = analysis_params.n_neighbors
@@ -64,6 +64,7 @@ class tools:
 		## Calculate cell clusters via the chosen clustering algorithm
 		getattr(sc.tl, self.clustering_choice)(adata, resolution=self.resolution)
 
+		## Run diffusion pseudotime analysis
 		if self.dpt:
 			adata.uns['iroot'] = np.flatnonzero(adata.obs[self.dpt[0]].isin(self.dpt[1]))[0]
 			print(adata.uns['iroot'])

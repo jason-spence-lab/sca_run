@@ -28,6 +28,7 @@ class plotting:
             vmax_list:List of y-axis maximums for cell scoring feature plots
             rank_grouping: Metadata observations to group differential gene analyses
             clusters2_compare: Clusters to compare for differential gene analysis
+            final_quality: Makes high resolution figures in pdf
         '''
         self.size = plot_params.size
         self.umap_obs = plot_params.umap_obs
@@ -106,7 +107,7 @@ class plotting:
         loadings_components = range(sca_params.analysis_params.n_pcs-components, sca_params.analysis_params.n_pcs+components+1)
         sc.pl.pca_loadings(adata, components=loadings_components, save='_rank_genes.png', show=False)
 
-        ## Plot results of UMAP dimensional reduction and clustering
+        ## Plot results of UMAP (and t-SNE) dimensional reduction and clustering
         for observation in self.umap_obs:
             legend = 'on data' if (observation==sca_params.analysis_params.clustering_choice) else 'right margin'
             sc.pl.umap(adata, color=observation, save=''.join(['_',observation,file_type]), show=False,

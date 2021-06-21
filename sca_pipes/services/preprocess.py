@@ -15,6 +15,8 @@ class preprocess:
 				 pp_params):
 		'''
 		gene_dict: Dictionary of genes_lists to plot and score
+		Preprocessing Params --
+		    combat: Run combat batch correction across the specified metadata field
 		'''
 		self.gene_dict = gene_dict
 		self.combat = pp_params.combat

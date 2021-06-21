@@ -32,7 +32,7 @@ import services.tools as tools
 import services.plotting as plotting
 
 class SCARunner:
-	sc.settings.verbosity = 3
+	sc.settings.verbosity = 3 # verbosity: errors (0), warnings (1), info (2), hints (3)
 	'''
 	Organizes single-cell functions into distinct pipelines
 	'''
@@ -50,6 +50,15 @@ class SCARunner:
 		'''
 		sca_dict is a dictionary of miscellaneous analysis information including
 		parameters, sample list and gene_lists
+
+		sca_params: Class that handles all relevant parameters for setting up a SCARunner session
+		figdir: The path for saving figures generated during the analysis
+		adata_filtered: AnnData that's already been quality controlled 
+		adata_loaded: AnnData that already exists, eg., other lab's AnnData downloaded online
+		load_save: AnnData saved for the analysis to duplicate
+		new_save: Pickle module that contains analysis information and relevant AnnData objects
+		remove_genes: List of unnecessary genes that should not be used in analysis
+		only_plot: Choose to only plot graphs with existing AnnData objects
 
 		Uses the pickle module to save adata instances for easy access in future analyses
 		*Note that pickled adata files are very large - min 4GB (make sure to clean out unused pickle files)
@@ -120,6 +129,14 @@ class SCARunner:
 		'''
 		Allows loading of a saved pickle adata file, file must contained adata that has gone through a complete pipeline
 		Otherwise will complete a new full analysis, and then extracts clusters
+
+		sca_params: Class that handles all relevant parameters for setting up a SCARunner session
+		extracted: List of the numbers of interested clusters
+		figdir: The path for saving figures generated during the analysis
+		load_save: AnnData saved for the analysis to duplicate
+		new_save: Pickle module that contains analysis information and relevant AnnData objects from the extraction
+		label: Name of the file folder that contains the output files generated in the extraction
+		no_preprocess: Indicator of whether the AnnData object is processed or not
 		'''
 		## Ask user for input on which clusters to extract
 		if extracted is None:
