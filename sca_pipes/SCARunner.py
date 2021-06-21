@@ -155,6 +155,7 @@ class SCARunner:
 				sca_params.adata_unscaled = pp.adata_unscaled.copy()
 			else:
 				sca_params.adata_postQC = sca_params.adata_postQC[adata.obs['louvain'].isin(extracted)].copy()
+				# Need to add save sca_params.adata_unscaled
 				adata_ext = sca_params.adata[adata.obs['louvain'].isin(extracted)].copy()
 		else:
 			print(extracted, "is not a valid input")
