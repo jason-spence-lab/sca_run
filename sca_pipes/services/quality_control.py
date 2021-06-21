@@ -14,12 +14,14 @@ class quality_control:
 	'''
 	def __init__(self, qc_params, species):
 		'''
-		min_cells: Filter out genes with a few number of cells
-		min_genes: Filter out cells with fewer genes to remove dead cells
-		max_genes: Filter out cells with more genes to remove most doublets
-		max_counts: Filter out cells with more UMIs to catch a few remaining doublets
-		max_mito: Filter out cells with high mitochondrial gene content
-		doublet_detection: Run DoubletDetection by Jonathan Shor
+		Quality Control Params --
+			min_cells: Filter out genes with a few number of cells
+			min_genes: Filter out cells with fewer genes to remove dead cells
+			max_genes: Filter out cells with more genes to remove most doublets
+			max_counts: Filter out cells with more UMIs to catch a few remaining doublets
+			max_mito: Filter out cells with high mitochondrial gene content
+			doublet_detection: Run DoubletDetection by Jonathan Shor
+			species: The species of samples used, examples: human, mouse
 		'''
 		self.min_cells = qc_params.min_cells
 		self.min_genes = qc_params.min_genes
@@ -79,7 +81,7 @@ class quality_control:
 		## Actually do the filtering.
 		if self.doublet_detection:
 			adata = adata[((adata.obs['labels'] != 1)
-		 				& (adata.obs['percent_mito'] < param_dict['max_mito']))].copy()
+						& (adata.obs['percent_mito'] < param_dict['max_mito']))].copy()
 		else:
 			adata = adata[((adata.obs['n_genes'] < self.max_genes)   # Keep cells with less than __ genes to remove most doublets
 						& (adata.obs['n_counts'] < self.max_counts)   # Keep cells with less than __ UMIs to catch a few remaining doublets

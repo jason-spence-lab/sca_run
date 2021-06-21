@@ -7,6 +7,7 @@ Written by Joshua H Wu
 '''
 from pathlib import Path
 import scanpy as sc
+import os
 
 class load_data:
 	def __init__(self,
@@ -20,6 +21,14 @@ class load_data:
 		self.initial_cell_count=None
 		self.initial_gene_count=None
 		self.annotation_dict={}
+	'''
+	Load Data Params --
+		storage_mount_point: Data storage mount location to turbo or MIstorage
+		sample_list: List of interested samples 
+		remove_genes: List of unnecessary genes that should not be used in analysis
+		initial_cell_count: Inital count of cells in the samples before analysis
+		initial_gene_count: Inital count of genes in the samples before analysis
+	'''
 
 	## Loads data from storage point and creates an AnnData object 
 	# Adds metadata to adata object 
@@ -29,10 +38,14 @@ class load_data:
 		The raw data folder contains folders of sample runs as well as the meta-data table
 		'''
 		print("Loading data into AnnData object")
-
+		
+		## Add raw data file directory if it doesn't exist
+		os.makedirs(os.path.dirname('./data/'), exist_ok=True)
 		## Location to output the anndata h5ad files
-		raw_data_file = ''.join(['./data/Data_','_'.join(self.sample_list),'.scanpy.raw.h5ad'])  # the file that will store the raw combined data
-		results_file = ''.join(['./data/Data_','_'.join(self.sample_list),'.processed.h5ad'])  # the file that will store the analysis results
+		raw_data_file = ''.join(['./data/Data_','_'.join(self.sample_list),
+								 '.scanpy.raw.h5ad'])  # the file that will store the raw combined data
+		results_file = ''.join(['./data/Data_','_'.join(self.sample_list),
+								'.processed.h5ad'])  # the file that will store the analysis results
 
 		## Creates a dictionary with sample id key, data file location, and relevant metadata
 		annotation_dict = dict()
@@ -115,7 +128,12 @@ class load_data:
 							  adata,
 							  text_file=None):
 		'''
-		List of genes can be in either a line separated text file or a Python list
+		In:
+		adata: AnnData object
+		text_file: List of undesired genes that can be in either a line separated text file or a Python list
+		
+		Out: 
+		New filtered AnnData object
 
 		Useful for removing unnecessary genes from the analysis such as blood genes
 		'''

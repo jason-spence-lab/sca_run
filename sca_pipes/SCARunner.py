@@ -32,7 +32,7 @@ import services.tools as tools
 import services.plotting as plotting
 
 class SCARunner:
-	sc.settings.verbosity = 3
+	sc.settings.verbosity = 3 # verbosity: errors (0), warnings (1), info (2), hints (3)
 	'''
 	Organizes single-cell functions into distinct pipelines
 	'''
@@ -50,6 +50,15 @@ class SCARunner:
 		'''
 		sca_dict is a dictionary of miscellaneous analysis information including
 		parameters, sample list and gene_lists
+
+		sca_params: Class that handles all relevant parameters for setting up a SCARunner session
+		figdir: The path for saving figures generated during the analysis
+		adata_filtered: AnnData that's already been quality controlled 
+		adata_loaded: AnnData that already exists, eg., other lab's AnnData downloaded online
+		load_save: AnnData saved for the analysis to duplicate
+		new_save: Pickle module that contains analysis information and relevant AnnData objects
+		remove_genes: List of unnecessary genes that should not be used in analysis
+		only_plot: Choose to only plot graphs with existing AnnData objects
 
 		Uses the pickle module to save adata instances for easy access in future analyses
 		*Note that pickled adata files are very large - min 4GB (make sure to clean out unused pickle files)
@@ -72,8 +81,8 @@ class SCARunner:
 					adata = adata_loaded.copy()
 				else:
 					ld = load_data.load_data(storage_mount_point = sca_params.storage_mount_point,
-										     sample_list = sca_params.sample_list,
-										     remove_genes = remove_genes)
+											 sample_list = sca_params.sample_list,
+											 remove_genes = remove_genes)
 					adata = ld.load().copy()
 					sca_params.initial_cell_count = ld.initial_cell_count
 					sca_params.initial_gene_count = ld.initial_gene_count
@@ -115,11 +124,19 @@ class SCARunner:
 
 	## Pipeline for analysis in which you extract interesting clusters/observations after an initial run
 	# Extracts clusters to an filtered but unprocessed AnnData object, then reprocesses and reclusters
-	def pipe_ext(self, sca_params, extracted, figdir='./figures/', load_save=None, new_save='adata_save.p', label='',
+	def pipe_ext(self, sca_params, extracted, figdir='./figures/', load_save=None, new_save='extracted_adata_save.p', label='',
 				 no_preprocess=False):
 		'''
 		Allows loading of a saved pickle adata file, file must contained adata that has gone through a complete pipeline
 		Otherwise will complete a new full analysis, and then extracts clusters
+
+		sca_params: Class that handles all relevant parameters for setting up a SCARunner session
+		extracted: List of the numbers of interested clusters
+		figdir: The path for saving figures generated during the analysis
+		load_save: AnnData saved for the analysis to duplicate
+		new_save: Pickle module that contains analysis information and relevant AnnData objects from the extraction
+		label: Name of the file folder that contains the output files generated in the extraction
+		no_preprocess: Indicator of whether the AnnData object is processed or not
 		'''
 		## Ask user for input on which clusters to extract
 		if extracted is None:
@@ -146,7 +163,7 @@ class SCARunner:
 
 			if not no_preprocess:
 				## Create an unprocessed AnnData object with the desired clusters
-				adata_ext = sca_params.adata_postQC[adata.obs['louvain'].isin(extracted)].copy()
+				adata_ext = sca_params.adata_postQC[adata.obs[sca_params.analysis_params.clustering_choice].isin(extracted)].copy()
 				sca_params.adata_postQC = adata_ext.copy()
 
 				## Reprocess and recluster extracted cells
@@ -154,9 +171,9 @@ class SCARunner:
 				adata_ext = pp.run_preprocess(adata_ext)
 				sca_params.adata_unscaled = pp.adata_unscaled.copy()
 			else:
-				sca_params.adata_postQC = sca_params.adata_postQC[adata.obs['louvain'].isin(extracted)].copy()
+				sca_params.adata_postQC = sca_params.adata_postQC[adata.obs[sca_params.analysis_params.clustering_choice].isin(extracted)].copy()
 				# Need to add save sca_params.adata_unscaled
-				adata_ext = sca_params.adata[adata.obs['louvain'].isin(extracted)].copy()
+				adata_ext = sca_params.adata[adata.obs[sca_params.analysis_params.clustering_choice].isin(extracted)].copy()
 		else:
 			print(extracted, "is not a valid input")
 			return
