@@ -113,12 +113,24 @@ class sca_params:
 		return asdict(self.qc_params)
 
 	def set_pp_params(self,
-					  combat='None'):
+					  combat='None',
+					  min_mean=0.0125,
+					  max_mean=3,
+					  min_disp=0.5,
+					  regress_out=['n_counts','percent_mito']):
 		'''
 		Preprocess Params --
 			combat: Run Combat batch correction across the specified metadata field
+			min_mean: Low cutoff for feature (gene) means
+			max_mean: High cutoff for feature (gene) means
+			min_disp: Low cutoff for feature (gene) dispersions
+			regress_out: Variables to regress out, for example, percent_mito
 		'''
-		self.pp_params = pp_params(combat=combat)
+		self.pp_params = pp_params(combat=combat,
+			                       min_mean=min_mean,
+			                       max_mean=max_mean,
+			                       min_disp=min_disp,
+			                       regress_out=regress_out)
 		return
 
 	## Return dictionary with filtering parameters
@@ -241,6 +253,13 @@ class sca_params:
 			f.write(''.join(['Max Mito:  ',str(self.qc_params.max_mito),'\n']))
 			f.write(''.join(['DoubletDetection:  ',str(self.qc_params.doublet_detection),'\n']))
 
+			f.write('\n--------Preprocessing Parameters Used--------\n')
+			f.write(''.join(['Combat:  ',str(self.pp_params.combat),'\n']))
+			f.write(''.join(['Min Mean:  ',str(self.pp_params.min_mean),'\n']))
+			f.write(''.join(['Max Mean:  ',str(self.pp_params.max_mean),'\n']))
+			f.write(''.join(['Min Disp:  ',str(self.pp_params.min_disp),'\n']))
+			f.write(''.join(['Regress Out:  ',str(self.pp_params.regress_out),'\n']))
+
 			f.write('\n--------Analysis Parameters Used--------\n')
 			f.write(''.join(['# Neighbors:  ',str(self.analysis_params.n_neighbors),'\n']))
 			f.write(''.join(['# PCs:  ',str(self.analysis_params.n_pcs),'\n']))
@@ -331,8 +350,16 @@ class pp_params:
 	'''
 	Preprocess Params DataClass --
 		combat: Run Combat batch correction across the specified metadata field
+		min_mean: Low cutoff for feature (gene) means
+		max_mean: High cutoff for feature (gene) means
+		min_disp: Low cutoff for feature (gene) dispersions
+		regress_out: Variables to regress out, for example, percent_mito
 	'''
 	combat: str='None'
+	min_mean: int=0.0125
+	max_mean: int=3
+	min_disp: int=0.5
+	regress_out: List[str] = field(default_factory=lambda: ['n_counts','percent_mito'])
 
 @dataclass
 class analysis_params:

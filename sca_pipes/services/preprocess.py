@@ -17,9 +17,17 @@ class preprocess:
 		gene_dict: Dictionary of genes_lists to plot and score
 		Preprocessing Params --
 		    combat: Run combat batch correction across the specified metadata field
+		    min_mean: Low cutoff for feature (gene) means
+		    max_mean: High cutoff for feature (gene) means
+		    min_disp: Low cutoff for feature (gene) dispersions
+		    regress_out: Variables to regress out, for example, percent_mito
 		'''
 		self.gene_dict = gene_dict
 		self.combat = pp_params.combat
+		self.min_mean = pp_params.min_mean
+		self.max_mean = pp_params.max_mean
+		self.min_disp = pp_params.min_disp
+		self.regress_out = pp_params.regress_out
 		self.adata_unscaled = None
 
 	## Standardize and normalize the data set
@@ -46,13 +54,13 @@ class preprocess:
 					adata.obs[key] = adata_scaled.X[:,adata_scaled.var_names.isin(self.gene_dict[key].markers)].mean(1)
 
 		## Identify highly-variable genes based on dispersion relative to expression level
-		sc.pp.highly_variable_genes(adata, min_mean=0.0125, max_mean=3, min_disp=0.5)
+		sc.pp.highly_variable_genes(adata, min_mean=self.min_mean, max_mean=self.max_mean, min_disp=self.min_disp)
 
 		## Filter the genes to remove non-variable genes since they are uninformative
 		adata = adata[:, adata.var['highly_variable']].copy()
 
 		## Regress out effects of total reads per cell and the percentage of mitochondrial genes expressed.
-		sc.pp.regress_out(adata, ['n_counts','percent_mito'])
+		sc.pp.regress_out(adata, self.regress_out)
 
 		if not self.combat is 'None':
 			print("Conducting combat batch correction")
