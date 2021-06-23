@@ -21,7 +21,8 @@ class quality_control:
 			max_counts: Filter out cells with more UMIs to catch a few remaining doublets
 			max_mito: Filter out cells with high mitochondrial gene content
 			doublet_detection: Run DoubletDetection by Jonathan Shor
-			species: The species of samples used, examples: human, mouse
+
+		species: The species of samples used, examples: human, mouse
 		'''
 		self.min_cells = qc_params.min_cells
 		self.min_genes = qc_params.min_genes

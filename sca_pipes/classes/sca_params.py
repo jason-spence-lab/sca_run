@@ -60,7 +60,7 @@ class sca_params:
 		'''
 		Gene List Params --
 			markers: List of interesting genes to be plotted
-			label: Name of gene list
+			label: Name of the specific gene list
 			feature_positions: Index positions to highlight groups of markers - will draw a bracket around them
 			feature_groups: Labels of groups of markers highlighted
 			groupby_positions: Ordering of metadata groups on dot plot y-axis
@@ -151,7 +151,7 @@ class sca_params:
 		'''
 		Analysis Params --
 			n_neighbors: Size of the local neighborhood used for manifold approximation
-			n_pcs: Number of principle components to use in construction of neighborhood graph
+			n_pcs: Number of principal components to use in construction of neighborhood graph
 			spread: In combination with min_dist determines how clumped embedded points are
 			min_dist: Minimum distance between points on the umap graph
 			resolution: High resolution attempts to increases # of clusters identified
@@ -239,6 +239,7 @@ class sca_params:
 				f.write('\n\n')
 
 			f.write('--------Basic Run Information--------\n')
+			f.write(''.join(['Species:  ',str(self.species),'\n']))
 			f.write(''.join(['Initial cell count:  ',str(self.initial_cell_count),'\n']))
 			f.write(''.join(['Final cell count:  ',str(self.final_cell_count),'\n']))
 			f.write(''.join(['Initial gene count:  ',str(self.initial_gene_count),'\n']))
@@ -366,7 +367,7 @@ class analysis_params:
 	'''
 	Analysis Params DataClass --
 		n_neighbors: Size of the local neighborhood used for manifold approximation
-		n_pcs: Number of principle components to use in construction of neighborhood graph
+		n_pcs: Number of principal components to use in construction of neighborhood graph
 		spread: In combination with min_dist determines how clumped embedded points are
 		min_dist: Minimum distance between points on the umap graph
 		resolution: High resolution attempts to increases # of clusters identified

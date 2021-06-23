@@ -48,9 +48,6 @@ class SCARunner:
 				   remove_genes=None,
 				   only_plot=False):
 		'''
-		sca_dict is a dictionary of miscellaneous analysis information including
-		parameters, sample list and gene_lists
-
 		sca_params: Class that handles all relevant parameters for setting up a SCARunner session
 		figdir: The path for saving figures generated during the analysis
 		adata_filtered: AnnData that's already been quality controlled 

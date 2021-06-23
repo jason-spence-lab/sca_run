@@ -15,7 +15,7 @@ class tools:
 		'''
 		Analysis Params --
 			n_neighbors: Size of the local neighborhood used for manifold approximation
-			n_pcs: Number of principle components to use in construction of neighborhood graph
+			n_pcs: Number of principal components to use in construction of neighborhood graph
 			spread: In combination with min_dist determines how clumped embedded points are
 			min_dist: Minimum distance between points on the umap graph
 			resolution: High resolution attempts to increases # of clusters identified
