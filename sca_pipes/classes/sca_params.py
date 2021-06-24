@@ -16,7 +16,7 @@ import pandas as pd
 
 class sca_params:
 	'''
-	Class that handles all relevant paramaters for setting up a SCARunner session
+	Class that handles all relevant parameters for setting up a SCARunner session
 	'''
 
 	def __init__(self):
@@ -71,7 +71,8 @@ class sca_params:
 			markers = [line.rstrip('\n') for line in open(''.join([load_file,'.txt']),'r')]
 		if not cell_score_list is 'Only':
 			self.gene_lists.append(label)
-
+		if self.species == 'mouse':
+			markers = [*map(lambda x:x.capitalize(), markers)]
 		if cell_score_list:
 			self.cell_score_lists.append(label)
 		self.gene_dict[label] = gene_list(markers=markers, 
@@ -101,17 +102,18 @@ class sca_params:
 			doublet_detection: Run DoubletDetection by Jonathan Shor
 		'''
 		self.qc_params = qc_params(min_cells=min_cells,
-			  					   min_genes=min_genes,
-			  					   max_genes=max_genes,
-			  					   max_counts=max_counts,
-			  					   max_mito=max_mito,
-			  					   doublet_detection=doublet_detection)
+								   min_genes=min_genes,
+								   max_genes=max_genes,
+								   max_counts=max_counts,
+								   max_mito=max_mito,
+								   doublet_detection=doublet_detection)
 		return
 
 	## Return dictionary with filtering parameters
 	def get_qc_dict(self):
 		return asdict(self.qc_params)
-
+   
+	## Creates object containing all of the preprocess parameters and sets as attribute
 	def set_pp_params(self,
 					  combat='None',
 					  min_mean=0.0125,
@@ -127,10 +129,10 @@ class sca_params:
 			regress_out: Variables to regress out, for example, percent_mito
 		'''
 		self.pp_params = pp_params(combat=combat,
-			                       min_mean=min_mean,
-			                       max_mean=max_mean,
-			                       min_disp=min_disp,
-			                       regress_out=regress_out)
+								   min_mean=min_mean,
+								   max_mean=max_mean,
+								   min_disp=min_disp,
+								   regress_out=regress_out)
 		return
 
 	## Return dictionary with filtering parameters
@@ -270,8 +272,8 @@ class sca_params:
 			f.write(''.join(['BBKNN:  ',str(self.analysis_params.do_bbknn),'\n']))
 			f.write(''.join(['t-SNE:  ',str(self.analysis_params.do_tSNE),'\n']))
 			f.write(''.join(['Clustering Choice:  ',str(self.analysis_params.clustering_choice),'\n']))
-        
-        
+		
+		
 		cell_counts_array = self.__cell_counter(self.adata, cat1=self.analysis_params.clustering_choice, cat2='sampleName')
 		print(self.adata.obs[self.analysis_params.clustering_choice].cat.categories.to_list()+['total'])
 		print(self.adata.obs['sampleName'].cat.categories.to_list()+['total'])
