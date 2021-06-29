@@ -7,6 +7,7 @@ Written by Joshua H Wu
 '''
 from pathlib import Path
 import scanpy as sc
+import pandas as pd
 import os
 
 class load_data:
@@ -47,14 +48,21 @@ class load_data:
 		results_file = ''.join(['./data/Data_','_'.join(self.sample_list),
 								'.processed.h5ad'])  # the file that will store the analysis results
 
+
+		# Load meta-data table in xls format located at in the storage_mount_point - Change if located elsewhere
+		annotation_df = pd.read_excel(''.join([self.storage_mount_point,'01_RNAseq_RAW_Data/single_cell_meta_data_table_excel.xls']),
+									  header = None)
+
 		## Creates a dictionary with sample id key, data file location, and relevant metadata
 		annotation_dict = dict()
 
-		# Meta-data table located at in the storage_mount_point - Change if located elsewhere
-		for line in open(''.join([self.storage_mount_point,'01_RNAseq_RAW_Data/single_cell_meta_data_table.tsv']),'r'):
-			elem = str.split(line.rstrip())
-			if elem[0] not in annotation_dict:
-				annotation_dict[elem[0]] = elem[1:]
+		annotation_dict = annotation_df.set_index(0).T.dropna().to_dict('list')
+
+		# Below are the old codes for tsv files. Deprecated
+		# for line in open(''.join([self.storage_mount_point,'01_RNAseq_RAW_Data/single_cell_meta_data_table.tsv']),'r'):
+		# 	elem = str.split(line.rstrip())
+		# 	if elem[0] not in annotation_dict:
+		# 		annotation_dict[elem[0]] = elem[1:]
 
 		self.annotation_dict = annotation_dict
 
