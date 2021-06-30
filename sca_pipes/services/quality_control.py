@@ -81,8 +81,8 @@ class quality_control:
 
 		## Actually do the filtering.
 		if self.doublet_detection:
-			adata = adata[((adata.obs['labels'] != 1)
-						& (adata.obs['percent_mito'] < param_dict['max_mito']))].copy()
+			adata = adata[((adata.obs['doublet_labels'] != 1)
+						& (adata.obs['percent_mito'] < self.max_mito))].copy()
 		else:
 			adata = adata[((adata.obs['n_genes'] < self.max_genes)   # Keep cells with less than __ genes to remove most doublets
 						& (adata.obs['n_counts'] < self.max_counts)   # Keep cells with less than __ UMIs to catch a few remaining doublets
