@@ -200,7 +200,7 @@ class plotting:
         
         if sca_params.qc_params.doublet_detection:
             import doubletdetection
-            sc.pl.umap(adata, color=["doublet", "doublet_score"], save='_doublet_test.png', show=False, edges=False, size=size)
+            sc.pl.umap(adata, color=['doublet_label', 'doublet_score'], save='_doublet_test.png', show=False, edges=False, size=size)
             f = doubletdetection.plot.convergence(sca_params.doublet_clf, save=''.join([figdir,'convergence_test.pdf']), show=False, p_thresh=1e-16, voter_thresh=0.5)
             f3 = doubletdetection.plot.threshold(sca_params.doublet_clf, save=''.join([figdir,'threshold_test.pdf']), show=False, p_step=6)
 

@@ -50,7 +50,8 @@ class quality_control:
 			print("Starting doublet detection")
 			import doubletdetection
 			self.doublet_clf = doubletdetection.BoostClassifier(n_iters=50, use_phenograph=False, standard_scaling=True)
-			adata.obs['doublet_labels'] = self.doublet_clf.fit(adata.X.toarray()).predict(p_thresh=1e-16, voter_thresh=0.5)
+			adata.obs['doublet_label'] = self.doublet_clf.fit(adata.X).predict(p_thresh=1e-16, voter_thresh=0.5)
+			adata.obs['doublet_score'] = self.doublet_clf.doublet_score()
 
 		## Basic filtering to get rid of useless cells and unexpressed genes
 		sc.pp.filter_genes(adata, min_cells=self.min_cells)
@@ -86,7 +87,7 @@ class quality_control:
 
 		## Actually do the filtering.
 		if self.doublet_detection:
-			adata = adata[((adata.obs['doublet_labels'] != 1)
+			adata = adata[((adata.obs['doublet_label'] != 1)
 						& (adata.obs['pct_counts_mito'] < self.max_mito))].copy()
 		else:
 			adata = adata[((adata.obs['n_genes_by_counts'] < self.max_genes)   # Keep cells with less than __ genes to remove most doublets
