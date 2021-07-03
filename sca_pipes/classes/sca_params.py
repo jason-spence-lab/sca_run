@@ -148,8 +148,10 @@ class sca_params:
 							resolution=0.4,
 							do_bbknn=False,
 							do_tSNE=False,
-							clustering_choice="leiden",
-							dpt=[]):
+							clustering_choice='leiden',
+							dpt=[],
+							draw_force_atlas=False,
+							umap_init_pos='spectral'):
 		'''
 		Analysis Params --
 			n_neighbors: Size of the local neighborhood used for manifold approximation
@@ -161,6 +163,8 @@ class sca_params:
 			do_tSNE: Run tSNE dimensional reduction analysis
 			clustering_choice: Run leiden clustering or louvain clustering based on user's choice. Default is leiden clustering 
 			dpt: Run diffusion pseudotime analysis with input: ['metadata_cat','group']
+			draw_force_atlas: Run force-directed graphing of data
+			umap_init_pos: Basis from which to initiate umap embedding ('paga','spectra','random')
 		'''
 
 		self.analysis_params = analysis_params(n_neighbors=n_neighbors,
@@ -171,7 +175,9 @@ class sca_params:
 											   do_bbknn=do_bbknn,
 											   do_tSNE=do_tSNE,
 											   clustering_choice=clustering_choice,
-											   dpt=dpt)
+											   dpt=dpt,
+											   draw_force_atlas=draw_force_atlas,
+											   umap_init_pos=umap_init_pos)
 		return
 
 	## Return dictionary with analysis parameters
@@ -377,6 +383,8 @@ class analysis_params:
 		do_tSNE: Run tSNE clustering analysis
 		clustering_choice: Run leiden clustering or louvain clustering based on user's choice
 		dpt: Run diffusion pseudotime analysis with input: ['metadata_cat','group']
+		draw_force_atlas: Run force-directed graphing of data
+		umap_init_pos: Basis from which to initiate umap embedding ('paga','spectra','random')
 	'''
 	n_neighbors: int=30
 	n_pcs: int=15
@@ -387,6 +395,8 @@ class analysis_params:
 	do_tSNE: bool=False
 	clustering_choice: str="leiden"
 	dpt: List[str] = field(default_factory=lambda: ['leiden',['0']])
+	draw_force_atlas: bool=False
+	umap_init_pos: str='spectral'
 
 @dataclass
 class plot_params:

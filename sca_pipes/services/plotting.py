@@ -116,8 +116,14 @@ class plotting:
             if sca_params.analysis_params.do_tSNE:
                 sc.pl.tsne(adata, color=observation, save=''.join(['_',observation,file_type]), show=False, 
                             legend_loc=legend, edges=False, size=size, palette=colors, alpha=0.75)
+
+            if sca_params.analysis_params.draw_force_atlas:
+                sc.pl.draw_graph(adata, color=observation, save=''.join(['_',observation,file_type]), show=False, 
+                            legend_loc=legend, edges=False, size=size, palette=colors, alpha=0.75)
+
         # sc.external.pl.phate(adata,gene_symbols=['CAV1','LY6D','KRT4','TP63','CDH1'], use_raw=True, color_map=my_feature_cmap,
         #                    save='phate.png', size=size)
+
         ## Find marker genes via Wilxocon test based on cluster assignment
         # Create a simple plot to show the top 25 most significant markers for each cluster
         # Write most significant markers to a csv file
@@ -152,6 +158,10 @@ class plotting:
 
                 if sca_params.analysis_params.do_tSNE:
                     sc.pl.tsne(adata, color=genes_to_plot, save= ''.join(['_featureplots_',gene_list,file_type]), show=False, 
+                           cmap=my_feature_cmap, size=size, use_raw=True, vmin=0)
+
+                if sca_params.analysis_params.draw_force_atlas:
+                    sc.pl.draw_graph(adata, color=genes_to_plot, save= ''.join(['_featureplots_',gene_list,file_type]), show=False, 
                            cmap=my_feature_cmap, size=size, use_raw=True, vmin=0)
         
                 feature_positions = gene_obj.feature_positions # Manually set and determined
@@ -196,6 +206,10 @@ class plotting:
         # tSNE Plots - should move to integrate in umap code
         if sca_params.analysis_params.do_tSNE:
             sc.pl.tsne(adata, color=missing_genes, save=''.join(['_featureplots_gray',file_type]), 
+                    show=False, cmap=gray_cmap, size=size, use_raw=True)
+
+        if sca_params.analysis_params.draw_force_atlas:
+            sc.pl.draw_graph(adata, color=missing_genes, save=''.join(['_featureplots_gray',file_type]), 
                     show=False, cmap=gray_cmap, size=size, use_raw=True)
         
         if sca_params.qc_params.doublet_detection:
@@ -278,7 +292,7 @@ class plotting:
         edge_width_scale=1
         min_edge_width=0.035
         max_edge_width=2
-        threshold=0.08
+        threshold=0.05
         sc.pl.paga(adata, layout='fr', threshold=threshold, node_size_scale=node_size_scale, 
             node_size_power=node_size_power, edge_width_scale=edge_width_scale,
             min_edge_width=min_edge_width, max_edge_width=max_edge_width, show=False, save = '_pagaPlot.png',

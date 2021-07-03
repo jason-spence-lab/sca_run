@@ -23,6 +23,8 @@ class tools:
 			do_tSNE: Run tSNE dimensional reduction analysis
 			clustering_choice: Run leiden clustering or louvain clustering based on user's choice. Default is leiden clustering 
 			dpt: Run diffusion pseudotime analysis with input: ['metadata_cat','group']
+			draw_force_atlas: Run force-directed graphing of data
+			umap_init_pos: Basis from which to initiate umap embedding ('paga','spectra','random')
 		'''
 		self.n_neighbors = analysis_params.n_neighbors
 		self.n_pcs = analysis_params.n_pcs
@@ -33,6 +35,8 @@ class tools:
 		self.do_tSNE = analysis_params.do_tSNE
 		self.clustering_choice = analysis_params.clustering_choice
 		self.dpt = analysis_params.dpt
+		self.draw_force_atlas = analysis_params.draw_force_atlas
+		self.umap_init_pos = analysis_params.umap_init_pos
 
 	## Run dimensional reduction analysis and clustering using KNN graph
 	def run_tools(self,
@@ -54,25 +58,55 @@ class tools:
 			## Compute nearest-neighbors
 			sc.pp.neighbors(adata, n_neighbors=self.n_neighbors, n_pcs=self.n_pcs)
 
+		## Calculate cell clusters via the chosen clustering algorithm
+		getattr(sc.tl, self.clustering_choice)(adata, resolution=self.resolution)
+
+
+		## Run PAGA to predict non-directional cluster-cluster relationships to infer possible developmental progressions
+		sc.tl.paga(adata, groups=self.clustering_choice, model='v1.2')
+		# Set the thresholds and scaling factors for drawing the paga map/plot
+		node_size_scale=1.25
+		node_size_power=0.9
+		edge_width_scale=1
+		min_edge_width=0.035
+		max_edge_width=2
+		threshold=0.05
+		sc.pl.paga(adata, layout='fr', threshold=threshold, node_size_scale=node_size_scale, 
+			node_size_power=node_size_power, edge_width_scale=edge_width_scale,
+			min_edge_width=min_edge_width, max_edge_width=max_edge_width, show=False, save = '_pagaPlot.png',
+			title='PAGA: Fruchterman Reingold',frameon=False)
+
 		## Run UMAP Dim reduction
-		sc.tl.umap(adata, spread=self.spread, min_dist=self.min_dist)#, n_components=50) # Min_dist needs to be between 0.01 to 0.5
+		sc.tl.umap(adata, spread=self.spread, min_dist=self.min_dist, init_pos='paga')#, n_components=50) # Min_dist needs to be between 0.01 to 0.5
 
 		## Run tSNE analysis
 		if self.do_tSNE:
 			sc.tl.tsne(adata, n_pcs=self.n_pcs)
 
-		## Calculate cell clusters via the chosen clustering algorithm
-		getattr(sc.tl, self.clustering_choice)(adata, resolution=self.resolution)
+		if self.draw_force_atlas:
+			adata_fa = adata.raw.to_adata().copy()
+			sc.pp.highly_variable_genes(adata_fa, min_mean=0.0125, max_mean=3, min_disp=0.5)
+			adata_fa = adata_fa[:, adata_fa.var['highly_variable']].copy()
+			sc.pp.neighbors(adata_fa, n_neighbors=self.n_neighbors, n_pcs=self.n_pcs)
+			adata_fa.uns['paga'] = adata.uns['paga']
+			sc.tl.draw_graph(adata_fa, init_pos='paga')
+			adata.obsm['X_draw_graph_fa'] = adata_fa.obsm['X_draw_graph_fa']
+			adata.uns['draw_graph'] = adata_fa.uns['draw_graph']
 
 		## Run diffusion pseudotime analysis
 		if self.dpt:
-			adata.uns['iroot'] = np.flatnonzero(adata.obs[self.dpt[0]].isin(self.dpt[1]))[0]
-			print(adata.uns['iroot'])
-			sc.tl.diffmap(adata)
-			sc.tl.dpt(adata, n_branchings=0, n_dcs=10)
+			adata_dpt = adata.raw.to_adata().copy()
+			sc.pp.neighbors(adata_dpt, n_neighbors=self.n_neighbors, n_pcs=self.n_pcs, method='gauss')
 
-		## Run PAGA to predict non-directional cluster-cluster relationships to infer possible developmental progressions
-		sc.tl.paga(adata, groups=self.clustering_choice, model='v1.2')
+			adata_dpt.uns['iroot'] = np.flatnonzero(adata.obs[self.dpt[0]].isin(self.dpt[1]))[0]
+			print(adata_dpt.uns['iroot'])
+			sc.tl.diffmap(adata_dpt, n_comps=30)
+			sc.tl.dpt(adata_dpt, n_branchings=1, n_dcs=30)
+			adata.uns['iroot'] = adata_dpt.uns['iroot']
+			adata.uns['diffmap_evals'] = adata_dpt.uns['diffmap_evals']
+			adata.obsm['X_diffmap'] = adata_dpt.obsm['X_diffmap']
+			adata.obs['dpt_pseudotime'] = adata_dpt.obs['dpt_pseudotime']
+
 
 		## Do Dendrogram analysis based on PCs
 		sc.tl.dendrogram(adata, groupby=self.clustering_choice, n_pcs=self.n_pcs, linkage_method="median", use_raw=True)
