@@ -90,7 +90,7 @@ class sca_params:
 					  min_genes=500,
 					  max_genes=7000,
 					  max_counts=30000,
-					  max_mito=0.1,
+					  max_mito=10,
 					  doublet_detection = False):
 		'''
 		Quality Control Params --
@@ -119,14 +119,14 @@ class sca_params:
 					  min_mean=0.0125,
 					  max_mean=3,
 					  min_disp=0.5,
-					  regress_out=['n_counts','percent_mito']):
+					  regress_out=['total_counts','pct_counts_mito']):
 		'''
 		Preprocess Params --
 			combat: Run Combat batch correction across the specified metadata field
 			min_mean: Low cutoff for feature (gene) means
 			max_mean: High cutoff for feature (gene) means
 			min_disp: Low cutoff for feature (gene) dispersions
-			regress_out: Variables to regress out, for example, percent_mito
+			regress_out: Variables to regress out, for example, pct_counts_mito
 		'''
 		self.pp_params = pp_params(combat=combat,
 								   min_mean=min_mean,
@@ -351,7 +351,7 @@ class qc_params:
 	min_genes: int=500
 	max_genes: int=7000
 	max_counts: int=30000
-	max_mito: float=0.1
+	max_mito: float=10
 	doublet_detection: bool=False
 
 @dataclass
@@ -368,7 +368,7 @@ class pp_params:
 	min_mean: int=0.0125
 	max_mean: int=3
 	min_disp: int=0.5
-	regress_out: List[str] = field(default_factory=lambda: ['n_counts','percent_mito'])
+	regress_out: List[str] = field(default_factory=lambda: ['total_counts','pct_counts_mito'])
 
 @dataclass
 class analysis_params:

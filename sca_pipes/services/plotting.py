@@ -94,10 +94,10 @@ class plotting:
             file_type = '.png'
 
         ## Violin plots for filtering parameters pre and post
-        sc.pl.violin(adata, ['n_genes','n_counts','percent_mito'],
+        sc.pl.violin(adata, ['n_genes_by_counts','total_counts','pct_counts_mito'],
                      jitter=0.4, multi_panel=True, save='_postFiltered_plot.png', show=False)
         if sca_params.adata_preQC:
-            sc.pl.violin(sca_params.adata_preQC, ['n_genes','n_counts','percent_mito'],
+            sc.pl.violin(sca_params.adata_preQC, ['n_genes_by_counts','total_counts','pct_counts_mito'],
                         jitter=0.4, multi_panel=True, save='_preFiltered_plot.png', show=False)
 
         ## Draw the PCA elbow plot to determine which PCs to use
@@ -213,7 +213,8 @@ class plotting:
                     show=False, cmap=gray_cmap, size=size, use_raw=True)
         
         if sca_params.qc_params.doublet_detection:
-            sc.pl.umap(adata, color='doublet_labels', save='doublet_test.png', show=False, edges=False, size=size)
+            import doubletdetection
+            sc.pl.umap(adata, color=['doublet_label', 'doublet_score'], save='_doublet_test.png', show=False, edges=False, size=size)
             f = doubletdetection.plot.convergence(sca_params.doublet_clf, save=''.join([figdir,'convergence_test.pdf']), show=False, p_thresh=1e-16, voter_thresh=0.5)
             f3 = doubletdetection.plot.threshold(sca_params.doublet_clf, save=''.join([figdir,'threshold_test.pdf']), show=False, p_step=6)
 
@@ -279,12 +280,12 @@ class plotting:
 
         ## Scatter plots to identify clusters that are high in number of genes, UMI counts, and mito transcript fraction
         adata.obs['jitter'] = np.random.rand(len(adata.obs_names))*10
-        sc.pl.scatter(adata,x='jitter',y='n_genes',color=sca_params.analysis_params.clustering_choice,save='_n_genes.png',palette=colors,show=False)
-        sc.pl.scatter(adata,x='jitter',y='n_counts',color=sca_params.analysis_params.clustering_choice,save='_n_counts.png',palette=colors,show=False)
-        sc.pl.scatter(adata,x='jitter',y='percent_mito',color=sca_params.analysis_params.clustering_choice,save='_percent_mito.png',palette=colors,show=False)
+        sc.pl.scatter(adata,x='jitter',y='n_genes_by_counts',color=sca_params.analysis_params.clustering_choice,save='_n_genes_by_counts.png',palette=colors,show=False)
+        sc.pl.scatter(adata,x='jitter',y='total_counts',color=sca_params.analysis_params.clustering_choice,save='_total_counts.png',palette=colors,show=False)
+        sc.pl.scatter(adata,x='jitter',y='pct_counts_mito',color=sca_params.analysis_params.clustering_choice,save='_pct_counts_mito.png',palette=colors,show=False)
     
 
-        sc.pl.umap(adata,color=['n_genes','n_counts','percent_mito'],color_map=my_feature_cmap,save='_counts_check.png',show=False)
+        sc.pl.umap(adata,color=['n_genes_by_counts','total_counts','pct_counts_mito'],color_map=my_feature_cmap,save='_counts_check.png',show=False)
 
         # Set the thresholds and scaling factors for drawing the paga map/plot
         node_size_scale=1.25
@@ -372,22 +373,21 @@ class plotting:
 
     ## Takes a list of genes and determines if they exist within the data set and are variable
     # Appends results to genes_exist or missing_genes list if given
-    def __find_genes(self,adata, gene_list, genes_exist=None, missing_genes=None):
-        ## Check inputs
-        if not genes_exist:
-            genes_exist = []
+    def __find_genes(self,adata, gene_list, missing_genes=None):
 
-        if not missing_genes:
-            missing_genes = []
+        genes_missing_in_this_list = []
+        genes_exist = []
 
         ## Splits given gene list into two based on whether or not they exist or are invariable
         for gene in gene_list:
             gene_zero = (gene in adata.raw.var_names) and np.any(adata.raw[:,gene].X.toarray())
             (genes_exist if gene_zero else missing_genes).append(gene)
+            if not gene_zero: genes_missing_in_this_list.append(gene)
 
         missing_genes = list(set(missing_genes))
-        if missing_genes:
-            print('Sorry, the following genes are not expressed in this dataset or are invariable:',missing_genes,'\n')
+        genes_missing_in_this_list = list(set(genes_missing_in_this_list))
+        if genes_missing_in_this_list:
+            print('Sorry, the following genes are not expressed in this dataset or are invariable:',genes_missing_in_this_list,'\n')
 
         return [genes_exist, missing_genes]
 
