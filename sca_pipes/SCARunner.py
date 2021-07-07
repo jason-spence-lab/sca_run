@@ -1,7 +1,7 @@
 '''
 Applications of single cell data analysis techniques
-Written by Josh Wu and Mike Czerwinski
-8 May, 2020
+Written by Josh Wu, Mike Czerwinski, and Zhiwei Xiao
+7 July, 2021
 
 Relies heavily on the Scanpy Python module developed by the Theis Lab
 Read more about Scanpy at https://scanpy.readthedocs.io/en/latest/index.html
@@ -193,3 +193,45 @@ class SCARunner:
 		print("\nAll done!\n")
 
 		return self
+
+    ## Pipeline for analysis in which you map labels and embeddings from reference adata to new adata.
+	# Extracts clusters to an filtered but unprocessed AnnData object, then reprocesses and reclusters
+	def pipe_ingest(self, sca_params, adata, adata_ref, obs = 'leiden', embedding_method = 'umap', figdir='./figures/',
+	                new_save='ingest_adata_save.p', label=''):
+        '''
+		sca_params: Class that handles all relevant parameters for setting up a SCARunner session
+		adata: The annotated data matrix of shape n_obs × n_vars without labels and embeddings
+		adata_ref: The annotated data matrix of shape n_obs × n_vars with labels and embeddings which need to be mapped to adata
+		obs: The label of key in adata_ref.obs which need to be mapped to adata.obs, e.g., leiden
+		embedding_method: Embeddings in adata_ref which need to be mapped to adata, e.g., umap or pca
+		new_save: Pickle module that contains analysis information and relevant AnnData objects from ingesting
+		label: Name of the file folder that contains the output files generated during ingesting
+		'''
+
+		## performing ingestion
+		sc.tl.ingest(adata, adata_ref, obs=obs, embedding_method = embedding_method)
+
+		## Plot figures
+		scplt = plotting.plotting(sca_params.plot_params)
+		adata_ingest = scplt.plot_sca(adata,sca_params,figdir = ''.join([figdir,'ingest/',label,'/']))
+
+		sca_params.adata = adata.copy()
+		## Write a summary of the analysis to a text file including sample information and parameters
+		sca_params.write_summary(figdir=''.join([figdir,'ingest/',label,'/']))
+
+		## Save analysis information and relevant AnnData objects to the disk using the Pickle module
+		if new_save:
+			pickle.dump(sca_params,open(''.join([figdir,'ingest/',label,'/',new_save]),"wb"),protocol=4)
+
+		print("\nAll done!\n")
+
+
+
+
+
+
+
+
+
+
+
