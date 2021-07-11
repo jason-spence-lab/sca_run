@@ -53,7 +53,15 @@ class quality_control:
 			self.doublet_clf = doubletdetection.BoostClassifier(n_iters=50, use_phenograph=False, standard_scaling=True)
 			adata.obs['doublet_label'] = self.doublet_clf.fit(adata.X).predict(p_thresh=1e-16, voter_thresh=0.5)
 			adata.obs['doublet_score'] = self.doublet_clf.doublet_score()
-			self.adata_doublet = adata.copy()	
+			self.adata_doublet = adata.copy()
+			if self.species=='human':
+				self.adata_doublet.var["mito"] = self.adata_doublet.var_names.str.startswith('MT-')
+			elif self.species=='mouse':
+				self.adata_doublet.var["mito"] = self.adata_doublet.var_names.str.startswith('mt-')
+			else:
+				print("No valid species name - assuming human")
+				self.adata_doublet.var["mito"] = self.adata_doublet.var_names.str.startswith('MT-')
+			sc.pp.calculate_qc_metrics(self.adata_doublet, qc_vars=["mito"], inplace=True)	
 
 		## Basic filtering to get rid of useless cells and unexpressed genes
 		sc.pp.filter_genes(adata, min_cells=self.min_cells)

@@ -92,12 +92,12 @@ class SCARunner:
 				sca_params.adata_preQC = qc.adata_preQC.copy()
 				
 				if sca_params.qc_params.doublet_detection:
-					import doubletdetection
-					sc.pl.umap(qc.adata_doublet, color=['doublet_label', 'doublet_score'], save='_doublet_test.png', show=False, edges=False, size=size)
-					f = doubletdetection.plot.convergence(sca_params.doublet_clf, save=''.join([figdir,'convergence_test.pdf']), show=False, p_thresh=1e-16, voter_thresh=0.5)
-					f3 = doubletdetection.plot.threshold(sca_params.doublet_clf, save=''.join([figdir,'threshold_test.pdf']), show=False, p_step=6)
-			
-
+					adata_doublet = qc.adata_doublet
+					pp = preprocess.preprocess(sca_params.gene_dict, sca_params.pp_params)
+					adata_doublet = pp.run_preprocess(adata_doublet)
+					tl = tools.tools(sca_params.analysis_params)
+					adata_doublet = tl.run_tools(adata_doublet)
+					sca_params.adata_doublet = adata_doublet.copy()
 			else: 
 				adata = adata_filtered.copy()
 

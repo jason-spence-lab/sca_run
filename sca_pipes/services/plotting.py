@@ -136,6 +136,12 @@ class plotting:
                 sc.pl.rank_genes_groups_stacked_violin(adata, n_genes=n_genes_rank, use_raw=True, 
                         show=False, save=''.join(['_rank_violin_',rank_grouping,file_type]))
 
+        if sca_params.qc_params.doublet_detection:
+            import doubletdetection
+            sc.pl.umap(sca_params.adata_doublet, color=['doublet_label','doublet_score','n_genes_by_counts','total_counts','pct_counts_mito'], save='_doublet_test.pdf', show=False, edges=False, size=size)
+            f = doubletdetection.plot.convergence(sca_params.doublet_clf, save=''.join([figdir,'convergence_test.pdf']), show=False, p_thresh=1e-16, voter_thresh=0.5)
+            f3 = doubletdetection.plot.threshold(sca_params.doublet_clf, save=''.join([figdir,'threshold_test.pdf']), show=False, p_step=6)
+
         ## Feature plots and dot plot analysis for each specified set of genes
         #sc.pl.rank_genes_groups(adata, n_genes=25, sharey=False, save='_markerPlots.png', show=False)
         if sca_params.gene_lists:
@@ -198,7 +204,6 @@ class plotting:
             sc.pl.tsne(adata, color=missing_genes, save=''.join(['_featureplots_gray',file_type]), 
                     show=False, cmap=gray_cmap, size=size, use_raw=True)
         
-
         # Generate a umap feature plot based on cell scoring
         if sca_params.cell_score_lists:
             max_list_len = max([len(self.vmax_list),len(self.vmin_list),len(sca_params.cell_score_lists)])
