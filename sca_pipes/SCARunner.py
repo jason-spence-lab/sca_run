@@ -90,6 +90,14 @@ class SCARunner:
 				adata = qc.run_qc(adata).copy()
 				sca_params.doublet_clf = qc.doublet_clf
 				sca_params.adata_preQC = qc.adata_preQC.copy()
+				
+				if sca_params.qc_params.doublet_detection:
+					import doubletdetection
+					sc.pl.umap(qc.adata_doublet, color=['doublet_label', 'doublet_score'], save='_doublet_test.png', show=False, edges=False, size=size)
+					f = doubletdetection.plot.convergence(sca_params.doublet_clf, save=''.join([figdir,'convergence_test.pdf']), show=False, p_thresh=1e-16, voter_thresh=0.5)
+					f3 = doubletdetection.plot.threshold(sca_params.doublet_clf, save=''.join([figdir,'threshold_test.pdf']), show=False, p_step=6)
+			
+
 			else: 
 				adata = adata_filtered.copy()
 
@@ -98,10 +106,14 @@ class SCARunner:
 			adata = pp.run_preprocess(adata).copy()
 			sca_params.adata_unscaled = pp.adata_unscaled.copy()
 
+
+
 		if not only_plot:
 			## Dimensional reduction and clustering - construction of the neighborhood graph
 			tl = tools.tools(sca_params.analysis_params)
 			adata = tl.run_tools(adata)
+
+
 
 		## Plot figures
 		scplt = plotting.plotting(sca_params.plot_params)
@@ -194,19 +206,26 @@ class SCARunner:
 
 		return self
 
-    ## Pipeline for analysis in which you map labels and embeddings from reference adata to new adata.
+	## Pipeline for analysis in which you map labels and embeddings from reference adata to new adata.
 	# Extracts clusters to an filtered but unprocessed AnnData object, then reprocesses and reclusters
 	def pipe_ingest(self, sca_params, adata, adata_ref, obs = 'leiden', embedding_method = 'umap', figdir='./figures/',
-	                new_save='ingest_adata_save.p', label=''):
-        '''
+					load_save = None, new_save='ingest_adata_save.p', label=''):
+		'''
 		sca_params: Class that handles all relevant parameters for setting up a SCARunner session
 		adata: The annotated data matrix of shape n_obs × n_vars without labels and embeddings
 		adata_ref: The annotated data matrix of shape n_obs × n_vars with labels and embeddings which need to be mapped to adata
 		obs: The label of key in adata_ref.obs which need to be mapped to adata.obs, e.g., leiden
 		embedding_method: Embeddings in adata_ref which need to be mapped to adata, e.g., umap or pca
+		load_save: AnnData saved for the analysis to duplicate, which contains adata and adata_ref
 		new_save: Pickle module that contains analysis information and relevant AnnData objects from ingesting
 		label: Name of the file folder that contains the output files generated during ingesting
 		'''
+
+		if load_save: # See if there is already a save file for the analysis to duplicate
+			run_save = pickle.load(open(''.join([figdir,load_save]),"rb"))
+
+			adata = run_save.adata.copy()
+			adata_ref = run_save.adata_ref
 
 		## performing ingestion
 		sc.tl.ingest(adata, adata_ref, obs=obs, embedding_method = embedding_method)

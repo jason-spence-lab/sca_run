@@ -4,10 +4,10 @@
 		adata = self.adata.copy()
 		df_meta = pd.DataFrame(data=[])
 		os.makedirs(os.path.dirname(''.join([figdir,'data_csvs/'])), exist_ok=True) 
-		adata.obs.loc[:,['louvain']].to_csv(''.join([figdir,'data_csvs/metadata.csv']))
+		adata.obs.loc[:,['louvain']].to_csv(''.join([figdir,'data_csvs/metadata.csv'])) #clustering_choice
 
 		## Export raw counts file
-		adata_postfiltered = self.adata_postFiltered.copy()
+		adata_postfiltered = self.adata_postFiltered.copy() # adata_post_qc
 		# sc.pp.normalize_total(adata_postfiltered)#,target_sum=10000)
 		adata_raw = adata.raw.copy()
 

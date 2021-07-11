@@ -198,11 +198,6 @@ class plotting:
             sc.pl.tsne(adata, color=missing_genes, save=''.join(['_featureplots_gray',file_type]), 
                     show=False, cmap=gray_cmap, size=size, use_raw=True)
         
-        if sca_params.qc_params.doublet_detection:
-            import doubletdetection
-            sc.pl.umap(adata, color=['doublet_label', 'doublet_score'], save='_doublet_test.png', show=False, edges=False, size=size)
-            f = doubletdetection.plot.convergence(sca_params.doublet_clf, save=''.join([figdir,'convergence_test.pdf']), show=False, p_thresh=1e-16, voter_thresh=0.5)
-            f3 = doubletdetection.plot.threshold(sca_params.doublet_clf, save=''.join([figdir,'threshold_test.pdf']), show=False, p_step=6)
 
         # Generate a umap feature plot based on cell scoring
         if sca_params.cell_score_lists:
