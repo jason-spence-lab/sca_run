@@ -1,25 +1,49 @@
+import scanpy as sc
+import numpy as np
+import matplotlib as mpl
+import matplotlib.pyplot as plt
+import copy
+import os
+import csv
+import pandas as pd
+from matplotlib import gridspec
+import services.plotting as plotting
+
+class cellphonedb:
+
+	def __init__(self, cellphonedb_params):
+        '''
+        Cellphonedb Params --
+            max_cbar_height: Maximum colorbar height
+            plot_type: 'means' for regular heatmap of significant means per interaction, 'counts' for matrix plot or total significant means for each grouping
+            y_labels: Add y axis labels to heatmap
+        '''
+        self.max_cbar_height = cellphonedb_params.max_cbar_height
+        self.plot_type = cellphonedb_params.plot_type
+        self.y_labels = cellphonedb_params.y_labels
+
 ## Writing metadata and counts csv files to be used as inputs into CellphoneDB analysis
 	# Uses log-normalized counts
-	def write_cpdb_data(self, figdir='/figures/'):
-		adata = self.adata.copy()
+	def write_cpdb_data(self, adata, sca_params, figdir='/figures/'):
+
 		df_meta = pd.DataFrame(data=[])
-		os.makedirs(os.path.dirname(''.join([figdir,'data_csvs/'])), exist_ok=True) 
-		adata.obs.loc[:,['louvain']].to_csv(''.join([figdir,'data_csvs/metadata.csv'])) #clustering_choice
+		os.makedirs(os.path.dirname(''.join([figdir,'csv_files/'])), exist_ok=True) 
+		adata.obs.loc[:,[sca_params.analysis_params.clustering_choice]].to_csv(''.join([figdir,'csv_files/metadata.csv'])) #clustering_choice
 
 		## Export raw counts file
-		adata_postfiltered = self.adata_postFiltered.copy() # adata_post_qc
+		adata_postQC = sca_params.adata_postQC.copy()
 		# sc.pp.normalize_total(adata_postfiltered)#,target_sum=10000)
 		adata_raw = adata.raw.copy()
 
 		df = pd.DataFrame(adata_raw.X.T.toarray())
-		df.columns = adata_postfiltered.obs.index
-		df.set_index(adata_postfiltered.var.index, inplace=True)
+		df.columns = adata_postQC.obs.index
+		df.set_index(adata_postQC.var.index, inplace=True)
 		print(df)
 
-		df.to_csv(''.join([figdir,'/data_csvs/counts.csv']))
+		df.to_csv(''.join([figdir,'/csv_files/counts.csv']))
 		return 0
 
-	def plot_colorbar(self,mappable, fig, subplot_spec, max_cbar_height: float = 4.0):
+	def plot_colorbar(self, mappable, fig, subplot_spec, max_cbar_height: float = 4.0):
 		"""
 		Plots a vertical color bar based on mappable.
 		The height of the colorbar is min(figure-height, max_cmap_height)
@@ -41,7 +65,6 @@
 		if height > max_cbar_height:
 			# to make the colorbar shorter, the
 			# ax is split and the lower portion is used.
-			from matplotlib import gridspec
 			axs2 = gridspec.GridSpecFromSubplotSpec(
 				2,
 				1,
@@ -57,7 +80,7 @@
 	#### Function for plotting cellphonedb data
 	# plot_type is 'means' for regular heatmap of significant means per interaction
 	# plot_type is 'counts' for matrix plot or total significant means for each grouping
-	def plot_cpdb_heatmap(self, plotted_vals, plot_type='means', figsave='cellphone_heatmap.png', y_labels=[]):
+	def plot_cpdb_heatmap(self, sca_params, plotted_vals, plot_type='means', figsave='cellphone_heatmap.png', y_labels=[]):
 		if plot_type=='means':
 			feature_colors = [(210,210,210), (210,210,210), (245,245,200), (100,200,225), (0,45,125)]
 			position=[0, 0.019999, 0.02, 0.55, 1]
@@ -65,7 +88,8 @@
 			feature_colors = [(220,220,220), (25,25,25)]
 			position=[0,1]
 
-		my_feature_cmap = self.make_cmap(feature_colors,position=position,bit=True)
+		scplt = plotting.plotting(sca_params.plot_params)
+		my_feature_cmap = scplt.make_cmap(feature_colors,position=position,bit=True)
 
 		colorbar_width = 0.3
 
@@ -81,7 +105,6 @@
 		]
 		fig = plt.figure(figsize=(width+2, height))
 
-		from matplotlib import gridspec
 		axs = gridspec.GridSpec(
 			nrows=2,
 			ncols=2,

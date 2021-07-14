@@ -2,8 +2,8 @@
 sca_params --
 Class that handles all relevant parameters for setting up a SCARunner session
 
-Written by Joshua H Wu
-5 August, 2020
+Written by Joshua H Wu and Zhiwei Xiao
+July 12, 2021
 '''
 
 from dataclasses import *
@@ -20,18 +20,19 @@ class sca_params:
 	'''
 
 	def __init__(self):
-		self.storage_mount_point = '/Volumes/mcomm-spencelab/'
+		self.storage_mount_point = '/Volumes/umms-spencejr/'
 		self.species = 'human'
 		self.sample_list = []
 		self.gene_lists = [] 
 		self.gene_dict = dict()
 		self.cell_score_lists = []
 
-		## Quality control, analysis, and plot parameter dataclass objects
+		## Quality control, preprocess, analysis, plot, and cellphonedb parameter dataclass objects
 		self.qc_params = qc_params()
 		self.pp_params = pp_params()
 		self.analysis_params = analysis_params()
 		self.plot_params = plot_params()
+		self.cellphonedb_params = cellphonedb_params()
 
 		## Summary Params
 		self.initial_cell_count = None
@@ -220,6 +221,27 @@ class sca_params:
 	def get_plot_dict(self):
 		return asdict(self.plot_params)
 
+		## Creates object containing all of the cellphonedb parameters and sets as attribute
+	def set_cellphonedb_params(self,
+					  max_cbar_height= 4.0,
+					  plot_type="means",
+					  y_labels=[]):
+		'''
+		Cellphonedb Params --
+		    max_cbar_height: Maximum colorbar height
+		    plot_type: 'means' for regular heatmap of significant means per interaction, 'counts' for matrix plot or total significant means for each grouping
+		    y_labels: Add y axis labels to heatmap
+		'''
+		self.cellphonedb_params = cellphonedb_params(max_cbar_height=max_cbar_height,
+			                                         plot_type = plot_type,
+			                                         y_labels = y_labels)						   
+		return
+
+	## Return dictionary with cellphonedb parameters
+	def get_cellphonedb_dict(self):
+		return asdict(self.cellphonedb_params)
+
+
 	## Write a summary of the analysis run including sample information, parameters and filtering information
 	# Not completely up to date
 	def write_summary(self, figdir='./figures/', extracted=[]):
@@ -272,6 +294,11 @@ class sca_params:
 			f.write(''.join(['BBKNN:  ',str(self.analysis_params.do_bbknn),'\n']))
 			f.write(''.join(['t-SNE:  ',str(self.analysis_params.do_tSNE),'\n']))
 			f.write(''.join(['Clustering Choice:  ',str(self.analysis_params.clustering_choice),'\n']))
+
+			f.write('\n--------Cellphonedb Parameters Used--------\n')
+			f.write(''.join(['Max Cbar Height:  ',str(self.cellphonedb_params.max_cbar_height),'\n']))
+			f.write(''.join(['Plot Type:  ',str(self.cellphonedb_params.plot_type),'\n']))
+			f.write(''.join(['Y labels:  ',str(self.cellphonedb_params.y_labels),'\n']))
 		
 		
 		cell_counts_array = self.__cell_counter(self.adata, cat1=self.analysis_params.clustering_choice, cat2='sampleName')
@@ -430,3 +457,18 @@ class gene_list:
 	feature_groups: List[str] = field(default_factory=list)
 	groupby_positions: List[str] = field(default_factory=list)
 	cell_score_list: str='None'
+
+@dataclass
+class cellphonedb_params:
+	'''
+	Cellphonedb Params DataClass --
+		max_cbar_height: Maximum colorbar height
+		plot_type: 'means' for regular heatmap of significant means per interaction, 'counts' for matrix plot or total significant means for each grouping
+		y_labels: Add y axis labels to heatmap
+	'''
+	max_cbar_height: float = 4.0
+	plot_type: List[str] = field(default_factory=lambda: ['means'])
+	y_labels: List[str] = field(default_factory=list)
+
+
+
