@@ -121,8 +121,13 @@ class plotting:
                 sc.pl.draw_graph(adata, color=observation, save=''.join(['_',observation,file_type]), show=False, 
                             legend_loc=legend, edges=False, size=size, palette=colors, alpha=0.75)
 
-        # sc.external.pl.phate(adata,gene_symbols=['CAV1','LY6D','KRT4','TP63','CDH1'], use_raw=True, color_map=my_feature_cmap,
-        #                    save='phate.png', size=size)
+            if sca_params.analysis_params.dpt:
+                sc.pl.diffmap(adata, color=observation, save=''.join(['_',observation,file_type]), show=False, 
+                            legend_loc=legend, edges=False, size=size, palette=colors, alpha=0.75)
+
+            if sca_params.analysis_params.phate:
+                sc.external.pl.phate(adata, color=observation, save=''.join(['_',observation,file_type]), show=False, 
+                            legend_loc=legend, edges=False, size=size, palette=colors, alpha=0.75)
 
         ## Find marker genes via Wilxocon test based on cluster assignment
         # Create a simple plot to show the top 25 most significant markers for each cluster
@@ -162,6 +167,14 @@ class plotting:
 
                 if sca_params.analysis_params.draw_force_atlas:
                     sc.pl.draw_graph(adata, color=genes_to_plot, save= ''.join(['_featureplots_',gene_list,file_type]), show=False, 
+                           cmap=my_feature_cmap, size=size, use_raw=True, vmin=0)
+
+                if sca_params.analysis_params.dpt:
+                    sc.pl.diffmap(adata, color=genes_to_plot, save= ''.join(['_featureplots_',gene_list,file_type]), show=False, 
+                           cmap=my_feature_cmap, size=size, use_raw=True, vmin=0)
+
+                if sca_params.analysis_params.phate:
+                    sc.external.pl.phate(adata, color=genes_to_plot, save= ''.join(['_featureplots_',gene_list,file_type]), show=False, 
                            cmap=my_feature_cmap, size=size, use_raw=True, vmin=0)
         
                 feature_positions = gene_obj.feature_positions # Manually set and determined
@@ -211,10 +224,18 @@ class plotting:
         if sca_params.analysis_params.draw_force_atlas:
             sc.pl.draw_graph(adata, color=missing_genes, save=''.join(['_featureplots_gray',file_type]), 
                     show=False, cmap=gray_cmap, size=size, use_raw=True)
+
+        if sca_params.analysis_params.dpt:
+            sc.pl.diffmap(adata, color=missing_genes, save=''.join(['_featureplots_gray',file_type]), 
+                    show=False, cmap=gray_cmap, size=size, use_raw=True)
+
+        if sca_params.analysis_params.dpt:
+            sc.external.pl.phate(adata, color=missing_genes, save=''.join(['_featureplots_gray',file_type]), 
+                    show=False, cmap=gray_cmap, size=size, use_raw=True)
         
         if sca_params.qc_params.doublet_detection:
             import doubletdetection
-            sc.pl.umap(adata, color=['doublet_label', 'doublet_score'], save='_doublet_test.png', show=False, edges=False, size=size)
+            sc.pl.umap(adata, color=['doublet_label'], save='_doublet_test.png', show=False, edges=False, size=size)
             f = doubletdetection.plot.convergence(sca_params.doublet_clf, save=''.join([figdir,'convergence_test.pdf']), show=False, p_thresh=1e-16, voter_thresh=0.5)
             f3 = doubletdetection.plot.threshold(sca_params.doublet_clf, save=''.join([figdir,'threshold_test.pdf']), show=False, p_step=6)
 

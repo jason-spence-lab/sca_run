@@ -151,7 +151,8 @@ class sca_params:
 							clustering_choice='leiden',
 							dpt=[],
 							draw_force_atlas=False,
-							umap_init_pos='spectral'):
+							umap_init_pos='spectral',
+							phate=False):
 		'''
 		Analysis Params --
 			n_neighbors: Size of the local neighborhood used for manifold approximation
@@ -165,6 +166,7 @@ class sca_params:
 			dpt: Run diffusion pseudotime analysis with input: ['metadata_cat','group']
 			draw_force_atlas: Run force-directed graphing of data
 			umap_init_pos: Basis from which to initiate umap embedding ('paga','spectra','random')
+			phate: Run Potential of Heat-diffusion for Affinity-based Trajectory Embedding (PHATE)
 		'''
 
 		self.analysis_params = analysis_params(n_neighbors=n_neighbors,
@@ -177,7 +179,8 @@ class sca_params:
 											   clustering_choice=clustering_choice,
 											   dpt=dpt,
 											   draw_force_atlas=draw_force_atlas,
-											   umap_init_pos=umap_init_pos)
+											   umap_init_pos=umap_init_pos,
+											   phate=phate)
 		return
 
 	## Return dictionary with analysis parameters
@@ -241,7 +244,7 @@ class sca_params:
 			f.write(''.join([' '.join(self.sample_list),'\n\n']))
 
 			f.write('--------Sample Metadata--------\n')
-			for sample in self.sample_list:
+			for sample in self.annotation_dict:
 				f.write(''.join(['- Sample ',sample,'\n']))
 				f.write('\n'.join(self.annotation_dict[sample]))
 				f.write('\n\n')
@@ -385,6 +388,7 @@ class analysis_params:
 		dpt: Run diffusion pseudotime analysis with input: ['metadata_cat','group']
 		draw_force_atlas: Run force-directed graphing of data
 		umap_init_pos: Basis from which to initiate umap embedding ('paga','spectra','random')
+		phate: Run Potential of Heat-diffusion for Affinity-based Trajectory Embedding (PHATE)
 	'''
 	n_neighbors: int=30
 	n_pcs: int=15
@@ -397,6 +401,7 @@ class analysis_params:
 	dpt: List[str] = field(default_factory=lambda: ['leiden',['0']])
 	draw_force_atlas: bool=False
 	umap_init_pos: str='spectral'
+	phate: bool=False
 
 @dataclass
 class plot_params:

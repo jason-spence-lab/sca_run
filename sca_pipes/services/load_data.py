@@ -33,7 +33,7 @@ class load_data:
 
 	## Loads data from storage point and creates an AnnData object 
 	# Adds metadata to adata object 
-	def load(self):
+	def load(self, file_type=None):
 		'''
 		Storage structure at the mount point includes 2 folders - processed data and raw
 		The raw data folder contains folders of sample runs as well as the meta-data table
@@ -48,10 +48,17 @@ class load_data:
 		results_file = ''.join(['./data/Data_','_'.join(self.sample_list),
 								'.processed.h5ad'])  # the file that will store the analysis results
 
-
-		# Load meta-data table in xls format located at in the storage_mount_point - Change if located elsewhere
-		annotation_df = pd.read_excel(''.join([self.storage_mount_point,'01_RNAseq_RAW_Data/single_cell_meta_data_table_excel.xls']),
-									  header = None)
+		if file_type == '.h5':
+			# Load meta-data table in xls format located at in the storage_mount_point - Change if located elsewhere
+			annotation_df = pd.read_excel(''.join([self.storage_mount_point,'01_RNAseq_RAW_Data/single_cell_meta_data_table_excel.xls']),
+										  header = None)
+		elif file_type == '.loom':
+			annotation_df = pd.read_excel(''.join([self.storage_mount_point,'01_RNAseq_RAW_Data/single_cell_meta_data_table_loom.xls']),
+										  header = None)
+		else:
+			print("No file type selected - assuming .h5")
+			annotation_df = pd.read_excel(''.join([self.storage_mount_point,'01_RNAseq_RAW_Data/single_cell_meta_data_table_excel.xls']),
+										  header = None)
 
 		## Creates a dictionary with sample id key, data file location, and relevant metadata
 		annotation_dict = dict()
@@ -75,9 +82,9 @@ class load_data:
 			adata = 0
 			for sample in self.sample_list:
 				if adata:
-					adata = adata.concatenate(self.__create_scanpy_anndata(self.storage_mount_point, sample, annotation_dict))
+					adata = adata.concatenate(self.__create_scanpy_anndata(self.storage_mount_point, sample, annotation_dict, file_type=file_type))
 				else:
-					adata = self.__create_scanpy_anndata(self.storage_mount_point, sample, annotation_dict)
+					adata = self.__create_scanpy_anndata(self.storage_mount_point, sample, annotation_dict, file_type=file_type)
 			
 			## Make cell names unique by adding _1, _2, _3 sequentially to each duplicated 10x barcode/name
 			adata.obs_names_make_unique()
@@ -103,7 +110,8 @@ class load_data:
 	def __create_scanpy_anndata(self,
 								storage_mount_point,
 								sampleID,
-								annotation_dict):
+								annotation_dict,
+								file_type=None):
 		'''
 		In:
 		storage_mount_point: Data storage mount location
@@ -115,8 +123,14 @@ class load_data:
 		'''
 		metadata_list = annotation_dict[sampleID][1:]
 		file_path = ''.join([storage_mount_point, annotation_dict[sampleID][0]])
+		if file_type == '.h5':
+			newAdata = sc.read_10x_h5(file_path)#,genome='GRCh38')# genome='hg19' or genome='GRCh38'
+		elif file_type == '.loom':
+			newAdata = sc.read_loom(file_path)
+		else:
+			print("No file type selected")
+			newAdata = sc.read(file_path)#,genome='GRCh38')# genome='hg19' or genome='GRCh38'
 
-		newAdata = sc.read_10x_h5(file_path)#,genome='GRCh38')# genome='hg19' or genome='GRCh38'
 
 		## Set gene names to be unique since there seem to be duplicate names from Cellranger
 		newAdata.var_names_make_unique()

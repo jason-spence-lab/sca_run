@@ -48,7 +48,7 @@ class quality_control:
 		# Conducting DoubletDetector analysis by Jonathan Shor
 		if self.doublet_detection:
 			print("Starting doublet detection")
-			import doubletdetection
+			import DoubletDetection as doubletdetection
 			self.doublet_clf = doubletdetection.BoostClassifier(n_iters=50, use_phenograph=False, standard_scaling=True)
 			adata.obs['doublet_label'] = self.doublet_clf.fit(adata.X).predict(p_thresh=1e-16, voter_thresh=0.5)
 			adata.obs['doublet_score'] = self.doublet_clf.doublet_score()
@@ -61,26 +61,26 @@ class quality_control:
 		# the `.A1` is only necessary as X is sparse (to transform to a dense array after summing)
 		if self.species=='human':
 			adata.var["mito"] = adata.var_names.str.startswith('MT-')
-			#mito_genes = adata.var_names.str.startswith('MT-')
+			mito_genes = adata.var_names.str.startswith('MT-')
 		elif self.species=='mouse':
 			adata.var["mito"] = adata.var_names.str.startswith('mt-')
-			#mito_genes = adata.var_names.str.startswith('mt-')
+			mito_genes = adata.var_names.str.startswith('mt-')
 		else:
 			print("No valid species name - assuming human")
 			adata.var["mito"] = adata.var_names.str.startswith('MT-')
-			#mito_genes = adata.var_names.str.startswith('MT-')
+			mito_genes = adata.var_names.str.startswith('MT-')
 
-		sc.pp.calculate_qc_metrics(adata, qc_vars=["mito"], inplace=True)
+		# sc.pp.calculate_qc_metrics(adata, qc_vars=["mito"], inplace=True)
 
-		# try:
-		# 	adata.obs['percent_mito'] = np.sum(adata[:,mito_genes].X, axis=1).A1 / np.sum(adata.X, axis=1).A1
-		# 	# add the total counts per cell as observations-annotation to adata
-		# 	adata.obs['n_counts'] = adata.X.sum(axis=1).A1
-		# except:
-		# 	adata.obs['percent_mito'] = np.sum(adata[:,mito_genes].X, axis=1) / np.sum(adata.X, axis=1)
+		try:
+			adata.obs['percent_mito'] = np.sum(adata[:,mito_genes].X, axis=1).A1 / np.sum(adata.X, axis=1).A1
+			# add the total counts per cell as observations-annotation to adata
+			adata.obs['n_counts'] = adata.X.sum(axis=1).A1
+		except:
+			adata.obs['percent_mito'] = np.sum(adata[:,mito_genes].X, axis=1) / np.sum(adata.X, axis=1)
 
-		# 	# add the total counts per cell as observations-annotation to adata
-		# 	adata.obs['n_counts'] = adata.X.sum(axis=1)
+			# add the total counts per cell as observations-annotation to adata
+			adata.obs['n_counts'] = adata.X.sum(axis=1)
 
 
 		self.adata_preQC = adata.copy() # Saving pre-Filtered AnnData
@@ -90,8 +90,8 @@ class quality_control:
 			adata = adata[((adata.obs['doublet_label'] != 1)
 						& (adata.obs['pct_counts_mito'] < self.max_mito))].copy()
 		else:
-			adata = adata[((adata.obs['n_genes_by_counts'] < self.max_genes)   # Keep cells with less than __ genes to remove most doublets
-						& (adata.obs['total_counts'] < self.max_counts)   # Keep cells with less than __ UMIs to catch a few remaining doublets
-						& (adata.obs['pct_counts_mito'] < self.max_mito))].copy()   # Keep cells with less than __ mito/genomic gene ratio
+			adata = adata[((adata.obs['n_counts'] < self.max_genes)   # Keep cells with less than __ genes to remove most doublets
+						& (adata.obs['n_counts'] < self.max_counts)   # Keep cells with less than __ UMIs to catch a few remaining doublets
+						& (adata.obs['percent_mito'] < self.max_mito))].copy()   # Keep cells with less than __ mito/genomic gene ratio
 
 		return adata
