@@ -1,7 +1,7 @@
 '''
 Applications of single cell data analysis techniques
-Written by Josh Wu and Mike Czerwinski
-8 May, 2020
+Written by Josh Wu, Mike Czerwinski, and Zhiwei Xiao
+7 July, 2021
 
 Relies heavily on the Scanpy Python module developed by the Theis Lab
 Read more about Scanpy at https://scanpy.readthedocs.io/en/latest/index.html
@@ -91,6 +91,14 @@ class SCARunner:
 				adata = qc.run_qc(adata).copy()
 				sca_params.doublet_clf = qc.doublet_clf
 				sca_params.adata_preQC = qc.adata_preQC.copy()
+				
+				if sca_params.qc_params.doublet_detection:
+					adata_doublet = qc.adata_doublet
+					pp = preprocess.preprocess(sca_params.gene_dict, sca_params.pp_params)
+					adata_doublet = pp.run_preprocess(adata_doublet)
+					tl = tools.tools(sca_params.analysis_params)
+					adata_doublet = tl.run_tools(adata_doublet)
+					sca_params.adata_doublet = adata_doublet.copy()
 			else: 
 				adata = adata_filtered.copy()
 
@@ -99,10 +107,14 @@ class SCARunner:
 			adata = pp.run_preprocess(adata).copy()
 			sca_params.adata_unscaled = pp.adata_unscaled.copy()
 
+
+
 		if not only_plot:
 			## Dimensional reduction and clustering - construction of the neighborhood graph
 			tl = tools.tools(sca_params.analysis_params)
 			adata = tl.run_tools(adata)
+
+
 
 		## Plot figures
 		scplt = plotting.plotting(sca_params.plot_params)
@@ -195,6 +207,7 @@ class SCARunner:
 
 		return self
 
+<<<<<<< HEAD
 	def pipe_cell_rank(self, sca_params, adata_filtered=None, figdir='./figures/', load_save=None):
 		import scvelo as scv 
 		import cellrank as cr 
@@ -407,3 +420,53 @@ class SCARunner:
                   ticks=False, label_prefix="PHATE")
 
 		return self
+=======
+	## Pipeline for analysis in which you map labels and embeddings from reference adata to new adata.
+	# Extracts clusters to an filtered but unprocessed AnnData object, then reprocesses and reclusters
+	def pipe_ingest(self, sca_params, adata, adata_ref, obs = 'leiden', embedding_method = 'umap', figdir='./figures/',
+					load_save = None, new_save='ingest_adata_save.p', label=''):
+		'''
+		sca_params: Class that handles all relevant parameters for setting up a SCARunner session
+		adata: The annotated data matrix of shape n_obs × n_vars without labels and embeddings
+		adata_ref: The annotated data matrix of shape n_obs × n_vars with labels and embeddings which need to be mapped to adata
+		obs: The label of key in adata_ref.obs which need to be mapped to adata.obs, e.g., leiden
+		embedding_method: Embeddings in adata_ref which need to be mapped to adata, e.g., umap or pca
+		load_save: AnnData saved for the analysis to duplicate, which contains adata and adata_ref
+		new_save: Pickle module that contains analysis information and relevant AnnData objects from ingesting
+		label: Name of the file folder that contains the output files generated during ingesting
+		'''
+
+		if load_save: # See if there is already a save file for the analysis to duplicate
+			run_save = pickle.load(open(''.join([figdir,load_save]),"rb"))
+
+			adata = run_save.adata.copy()
+			adata_ref = run_save.adata_ref
+
+		## performing ingestion
+		sc.tl.ingest(adata, adata_ref, obs=obs, embedding_method = embedding_method)
+
+		## Plot figures
+		scplt = plotting.plotting(sca_params.plot_params)
+		adata_ingest = scplt.plot_sca(adata,sca_params,figdir = ''.join([figdir,'ingest/',label,'/']))
+
+		sca_params.adata = adata.copy()
+		## Write a summary of the analysis to a text file including sample information and parameters
+		sca_params.write_summary(figdir=''.join([figdir,'ingest/',label,'/']))
+
+		## Save analysis information and relevant AnnData objects to the disk using the Pickle module
+		if new_save:
+			pickle.dump(sca_params,open(''.join([figdir,'ingest/',label,'/',new_save]),"wb"),protocol=4)
+
+		print("\nAll done!\n")
+
+
+
+
+
+
+
+
+
+
+
+>>>>>>> origin/Zhiwei_version_qc_matrices
