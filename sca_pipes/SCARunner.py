@@ -72,6 +72,8 @@ class SCARunner:
 			sca_params.annotation_dict = run_save.annotation_dict
 			sca_params.initial_cell_count = run_save.initial_cell_count
 			sca_params.initial_gene_count= run_save.initial_gene_count
+
+
 		else:
 			if not adata_filtered:
 				if adata_loaded:
@@ -208,15 +210,15 @@ class SCARunner:
 
 	## Pipeline for analysis in which you map labels and embeddings from reference adata to new adata.
 	# Extracts clusters to an filtered but unprocessed AnnData object, then reprocesses and reclusters
-	def pipe_ingest(self, sca_params, adata, adata_ref, obs = 'leiden', embedding_method = 'umap', figdir='./figures/',
-					load_save = None, new_save='ingest_adata_save.p', label=''):
+	def pipe_ingest(self, sca_params, adata, load_save, adata_ref, obs = 'leiden', embedding_method = 'umap', figdir='./figures/',
+					new_save='ingest_adata_save.p', label=''):
 		'''
 		sca_params: Class that handles all relevant parameters for setting up a SCARunner session
-		adata: The annotated data matrix of shape n_obs × n_vars without labels and embeddings
+		adata_load_save: 
 		adata_ref: The annotated data matrix of shape n_obs × n_vars with labels and embeddings which need to be mapped to adata
 		obs: The label of key in adata_ref.obs which need to be mapped to adata.obs, e.g., leiden
 		embedding_method: Embeddings in adata_ref which need to be mapped to adata, e.g., umap or pca
-		load_save: AnnData saved for the analysis to duplicate, which contains adata and adata_ref
+		load_save: 
 		new_save: Pickle module that contains analysis information and relevant AnnData objects from ingesting
 		label: Name of the file folder that contains the output files generated during ingesting
 		'''

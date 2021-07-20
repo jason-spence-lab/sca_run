@@ -61,7 +61,9 @@ class quality_control:
 			else:
 				print("No valid species name - assuming human")
 				self.adata_doublet.var["mito"] = self.adata_doublet.var_names.str.startswith('MT-')
-			sc.pp.calculate_qc_metrics(self.adata_doublet, qc_vars=["mito"], inplace=True)	
+			sc.pp.calculate_qc_metrics(self.adata_doublet, qc_vars=["mito"], inplace=True)
+			self.adata_doublet.obs = self.adata_doublet.obs.rename(columns={'n_genes_by_counts': 'n_genes', 'total_counts': 'n_counts', 'pct_counts_mito': 'percent_mito'})
+
 
 		## Basic filtering to get rid of useless cells and unexpressed genes
 		sc.pp.filter_genes(adata, min_cells=self.min_cells)
@@ -92,16 +94,18 @@ class quality_control:
 		# 	# add the total counts per cell as observations-annotation to adata
 		# 	adata.obs['n_counts'] = adata.X.sum(axis=1)
 
+		adata.obs = adata.obs.rename(columns={'n_genes_by_counts': 'n_genes', 'total_counts': 'n_counts', 'pct_counts_mito': 'percent_mito'})
 
 		self.adata_preQC = adata.copy() # Saving pre-Filtered AnnData
+
 
 		## Actually do the filtering.
 		if self.doublet_detection:
 			adata = adata[((adata.obs['doublet_label'] != 1)
-						& (adata.obs['pct_counts_mito'] < self.max_mito))].copy()
+						& (adata.obs['percent_mito'] < self.max_mito))].copy()
 		else:
-			adata = adata[((adata.obs['n_genes_by_counts'] < self.max_genes)   # Keep cells with less than __ genes to remove most doublets
-						& (adata.obs['total_counts'] < self.max_counts)   # Keep cells with less than __ UMIs to catch a few remaining doublets
-						& (adata.obs['pct_counts_mito'] < self.max_mito))].copy()   # Keep cells with less than __ mito/genomic gene ratio
+			adata = adata[((adata.obs['n_genes'] < self.max_genes)   # Keep cells with less than __ genes to remove most doublets
+						& (adata.obs['n_counts'] < self.max_counts)   # Keep cells with less than __ UMIs to catch a few remaining doublets
+						& (adata.obs['percent_mito'] < self.max_mito))].copy()   # Keep cells with less than __ mito/genomic gene ratio
 
 		return adata

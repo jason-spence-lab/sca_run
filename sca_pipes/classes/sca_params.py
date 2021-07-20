@@ -72,8 +72,8 @@ class sca_params:
 			markers = [line.rstrip('\n') for line in open(''.join([load_file,'.txt']),'r')]
 		if not cell_score_list is 'Only':
 			self.gene_lists.append(label)
-		if self.species == 'mouse':
-			markers = [*map(lambda x:x.capitalize(), markers)]
+		#if self.species == 'mouse':
+			#markers = [*map(lambda x:x.capitalize(), markers)]
 		if cell_score_list:
 			self.cell_score_lists.append(label)
 		self.gene_dict[label] = gene_list(markers=markers, 
@@ -120,7 +120,7 @@ class sca_params:
 					  min_mean=0.0125,
 					  max_mean=3,
 					  min_disp=0.5,
-					  regress_out=['total_counts','pct_counts_mito']):
+					  regress_out=['n_counts','percent_mito']):
 		'''
 		Preprocess Params --
 			combat: Run Combat batch correction across the specified metadata field
@@ -389,7 +389,7 @@ class pp_params:
 	min_mean: int=0.0125
 	max_mean: int=3
 	min_disp: int=0.5
-	regress_out: List[str] = field(default_factory=lambda: ['total_counts','pct_counts_mito'])
+	regress_out: List[str] = field(default_factory=lambda: ['n_counts','percent_mito'])
 
 @dataclass
 class analysis_params:

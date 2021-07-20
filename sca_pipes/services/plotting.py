@@ -94,10 +94,11 @@ class plotting:
             file_type = '.png'
 
         ## Violin plots for filtering parameters pre and post
-        sc.pl.violin(adata, ['n_genes_by_counts','total_counts','pct_counts_mito'],
+        sc.pl.violin(adata, ['n_genes','n_counts','percent_mito'],
                      jitter=0.4, multi_panel=True, save='_postFiltered_plot.png', show=False)
+
         if sca_params.adata_preQC:
-            sc.pl.violin(sca_params.adata_preQC, ['n_genes_by_counts','total_counts','pct_counts_mito'],
+            sc.pl.violin(sca_params.adata_preQC, ['n_genes','n_counts','percent_mito'],
                         jitter=0.4, multi_panel=True, save='_preFiltered_plot.png', show=False)
 
         ## Draw the PCA elbow plot to determine which PCs to use
@@ -138,7 +139,7 @@ class plotting:
 
         if sca_params.qc_params.doublet_detection:
             import doubletdetection
-            sc.pl.umap(sca_params.adata_doublet, color=['doublet_label','doublet_score','n_genes_by_counts','total_counts','pct_counts_mito'], save='_doublet_test.pdf', show=False, edges=False, size=size)
+            sc.pl.umap(sca_params.adata_doublet, color=['doublet_label','doublet_score','n_genes','n_counts','percent_mito'], save='_doublet_test.pdf', show=False, edges=False, size=size)
             f = doubletdetection.plot.convergence(sca_params.doublet_clf, save=''.join([figdir,'convergence_test.pdf']), show=False, p_thresh=1e-16, voter_thresh=0.5)
             f3 = doubletdetection.plot.threshold(sca_params.doublet_clf, save=''.join([figdir,'threshold_test.pdf']), show=False, p_step=6)
 
@@ -266,12 +267,12 @@ class plotting:
 
         ## Scatter plots to identify clusters that are high in number of genes, UMI counts, and mito transcript fraction
         adata.obs['jitter'] = np.random.rand(len(adata.obs_names))*10
-        sc.pl.scatter(adata,x='jitter',y='n_genes_by_counts',color=sca_params.analysis_params.clustering_choice,save='_n_genes_by_counts.png',palette=colors,show=False)
-        sc.pl.scatter(adata,x='jitter',y='total_counts',color=sca_params.analysis_params.clustering_choice,save='_total_counts.png',palette=colors,show=False)
-        sc.pl.scatter(adata,x='jitter',y='pct_counts_mito',color=sca_params.analysis_params.clustering_choice,save='_pct_counts_mito.png',palette=colors,show=False)
+        sc.pl.scatter(adata,x='jitter',y='n_genes',color=sca_params.analysis_params.clustering_choice,save='_n_genes.png',palette=colors,show=False)
+        sc.pl.scatter(adata,x='jitter',y='n_counts',color=sca_params.analysis_params.clustering_choice,save='_n_counts.png',palette=colors,show=False)
+        sc.pl.scatter(adata,x='jitter',y='percent_mito',color=sca_params.analysis_params.clustering_choice,save='_percent_mito.png',palette=colors,show=False)
     
 
-        sc.pl.umap(adata,color=['n_genes_by_counts','total_counts','pct_counts_mito'],color_map=my_feature_cmap,save='_counts_check.png',show=False)
+        sc.pl.umap(adata,color=['n_genes','n_counts','percent_mito'],color_map=my_feature_cmap,save='_counts_check.png',show=False)
 
         # Set the thresholds and scaling factors for drawing the paga map/plot
         node_size_scale=1.25
