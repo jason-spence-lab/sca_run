@@ -51,6 +51,9 @@ const styles = theme => ({
   	rightPane:{
   		borderLeft: '1px solid lightgray',
   		marginBottom: '5px',
+  		overflowY: 'scroll',
+  	},
+  	expansionGrid: {
   	},
  //  	formControl: {
 	//     // margin: theme.spacing(0),
@@ -69,7 +72,7 @@ const styles = theme => ({
 	    },
     },
     infoTitle: {
-    	padding: '0px 24px',
+    	padding: '8px 24px',
     	marginTop: '4px'
     },
     infoContent: {
@@ -109,22 +112,32 @@ const styles = theme => ({
 const basicFields = [
 	{
 		id:'name',
-		label:'Your Name',
+		label:'Michigan Unique ID',
 		value:'',
-		placeholder:'Josh'
+		placeholder:'wujos',
+		width:4,
+	},
+	{
+		id:'label',
+		label:'Analysis Label',
+		value:'',
+		placeholder:'Date',
+		width:4,
+	},
+	{
+		id:'species',
+		label:'Sample Species',
+		value:'human',
+		placeholder:'human',
+		width:4,
 	},
 	{
 		id:'sampleIDs',
 		label:'Sample IDs',
 		value:'',
-		placeholder:'Ex: 2444-1 or intmed-spence-lab/single_cell_analyses/Josh/figures_07072021/adata_save.p'
+		placeholder:'Ex: 2444-1 or intmed-spence-lab/single_cell_analyses/Josh/figures_07072021/adata_save.p',
+		width:12,
 	},
-	// {
-	// 	id:'markerGenes',
-	// 	label:'Initial Marker Genes',
-	// 	value:'',
-	// 	placeholder:'Ex: CDH5, EPCAM'
-	// },
 ];
 
 const qcFields = [
@@ -158,7 +171,7 @@ const preprocessFields = [
 	{
 		id:'highly_variable',
 		label:'Highly Variable Genes',
-		defaultValue:'Default',
+		defaultValue:'default',
 		helperText:'Number of highly variable genes to extract, if default will automatically calculate top genes'
 	},{
 		id:'regress_out',
@@ -183,7 +196,7 @@ const analysisFields = [
 	},{
 		id:'resolution',
 		label:'Resolution',
-		defaultValue:'0.1',
+		defaultValue:'0.4',
 		helperText:'Number of clusters identified'
 	}
 ]
@@ -197,7 +210,7 @@ const plotFields = [
 	},{
 		id: 'categorical_color',
 		label:'Categorical Dot Color',
-		defaultValue:'Default',
+		defaultValue:'default',
 		helperText:'Color palette for categorical data to be plotted on graph embeddings'
 	},{
 		id: 'color_map',
@@ -318,12 +331,14 @@ class BasicForm extends React.Component {
 
 		this.handleSetFiles = this.handleSetFiles.bind(this)
 
+		this.handleNoUserNameClose = this.handleNoUserNameClose.bind(this)
+
 		this.state = {
-			basicFieldValues:['',''],
+			basicFieldValues:['','','human',''],
 			qcFieldValues:['500','7500','30000','10'],
-			preprocessFieldValues:['Default','total_counts, pct_counts_mito'],
-			analysisFieldValues:['15','11','1','0.4','0.1'],
-			plotFieldValues:['15','Default','yellow_blue','low'],
+			preprocessFieldValues:['default','total_counts, pct_counts_mito'],
+			analysisFieldValues:['15','11','0.4'],
+			plotFieldValues:['15','default','yellow_blue','low','sampleName,leiden'],
 			umapFieldValues:['1','0.4'],
 			diffExpFieldValues:['leiden','all'],
 			dptFieldValues:['',''],
@@ -331,8 +346,6 @@ class BasicForm extends React.Component {
 			umapPos:'',
 			batchAlgo:'',
 			batchCat:'sampleName',
-			sampleIDs:'sample',
-			markerGenes:'marker',
 			umapCheck:false,
 			tsneCheck:false,
 			diffExpCheck:false,
@@ -360,6 +373,7 @@ class BasicForm extends React.Component {
 			diffexpopen:false,
 			submit:false,
 			file:"",
+			noUserName:false,
 		}
 	}
 
@@ -564,31 +578,70 @@ class BasicForm extends React.Component {
 	    this.setState({dptopen:false});
 	};
 
+	handleNoUserNameClose(e) {
+		this.setState({noUserName:false})
+	}
+
 	handleSubmit(e) {
-		const data = {
-			sample_list: this.state.basicFieldValues[0],
-			gene_list: this.state.basicFieldValues[1],
-			min_cells: this.state.qcFieldValues[0],
-			min_genes: this.state.qcFieldValues[1],
-			max_counts: this.state.qcFieldValues[2],
-			max_mito: this.state.qcFieldValues[3],
-			n_neighbors: this.state.analysisFieldValues[0],
-			n_pcs: this.state.analysisFieldValues[1],
-			spread: this.state.analysisFieldValues[2],
-			min_dist: this.state.analysisFieldValues[3],
-			resolution: this.state.analysisFieldValues[4]
+		if (this.state.basicFieldValues[0]=='') {
+			this.setState({noUserName:true})
+		} else {
+			const data = {
+				user_name: this.state.basicFieldValues[0],
+				analysis_label: this.state.basicFieldValues[1],
+				species: this.state.basicFieldValues[2],
+				sample_list: this.state.basicFieldValues[3],
+				min_genes: this.state.qcFieldValues[0],
+				max_genes: this.state.qcFieldValues[1],
+				max_counts: this.state.qcFieldValues[2],
+				max_mito: this.state.qcFieldValues[3],
+				highly_variable: this.state.preprocessFieldValues[0],
+				regress_out: this.state.preprocessFieldValues[1],
+				n_neighbors: this.state.analysisFieldValues[0],
+				n_pcs: this.state.analysisFieldValues[1],
+				resolution: this.state.analysisFieldValues[2],
+				doublet_detection: this.state.doubletCheck,
+				dot_size: this.state.plotFieldValues[0],
+				cat_color: this.state.plotFieldValues[1],
+				color_map: this.state.plotFieldValues[2],
+				figure_quality: this.state.plotFieldValues[3],
+				umap_check:this.state.umapCheck,
+				graph_cat: this.state.plotFieldValues[4],
+				umap_init_pos:this.state.umapPos,
+				spread: this.state.umapFieldValues[0],
+				min_dist: this.state.umapFieldValues[1],
+				tsne_check: this.state.tsneCheck,
+				// gene_exp_check: this.state.geneExpCheck,
+				gene_exp_cat: this.state.geneExpCat,
+				dot_check: this.state.dotCheck,
+				heat_check: this.state.heatCheck,
+				violin_check: this.state.violinCheck,
+				diff_exp_check: this.state.diffExpCheck,
+				comparison_cats: this.state.diffExpFieldValues[0],
+				groups_compare: this.state.diffExpFieldValues[1],
+				batch_check: this.state.batchCheck,
+				batch_algo: this.state.batchAlgo,
+				batch_cat: this.state.batchCat,
+				dpt_check: this.state.dptCheck,
+				root_cat:this.state.dptFieldValues[0],
+				root_group:this.state.dptFieldValues[1],
+				phate_check: this.state.phateCheck,
+				graph_fa_check: this.state.graphFACheck,
+				clusters_extract: this.state.extractClusters,
+				genes: this.state.file,
+			}
+
+			// call to api
+			this.setState({submit:true});
+
+			fetch('http://localhost:5000/submit', {
+			  method: 'POST', // or 'PUT'
+			  headers: {
+			    'Content-Type': 'application/json',
+			  },
+			  body: JSON.stringify(data), 
+			})
 		}
-
-		// call to api
-		this.setState({submit:true});
-
-		fetch('http://localhost:5000/submit', {
-		  method: 'POST', // or 'PUT'
-		  headers: {
-		    'Content-Type': 'application/json',
-		  },
-		  body: JSON.stringify(data), 
-		})
 	}
 
 	handleUpload(e) {
@@ -610,6 +663,9 @@ class BasicForm extends React.Component {
 			<Grid container component="main" alignItems='stretch' justify="center" spacing={1}>
 			  	<Grid item xs={5} sm={5} md={5}  component={Paper} className={classes.leftPane}>
 			  		<Container>
+			  			{this.state.noUserName && <Dialog onClose={this.handleNoUserNameClose} aria-labelledby="simple-dialog-title" open={this.state.noUserName}>
+					        <DialogTitle id="simple-dialog-title" className={classes.infoTitle}>Please provide your UMich unique ID</DialogTitle>
+					    </Dialog>}
 			  			<Typography variant="h7" color="inherit" noWrap>
 			      			Basic Information
 			    		</Typography>
@@ -625,26 +681,29 @@ class BasicForm extends React.Component {
 						        <br />
 					        </DialogContent>
 					    </Dialog>
-						{basicFields.map((field,i) => (
-							<TextField
-						        id={field.id}
-						        label={field.label}
-						        type="search"
-						        value={this.state.basicFieldValues[i]}
-						        //onClick={e=>this.setState({basicFieldValue:['']})}
-						        onChange={(e)=>{
-						        		this.handleBasicFieldChange(e.target.value,i);
-						        		//console.log(e.target.value)
-						        	}
-						        }
-						        className={classes.formField}
-						        placeholder={field.placeholder}
-						        fullWidth
-						        margin="normal"
-						        InputLabelProps={{
-						        	shrink: true,
-						        }}
-							/>))}
+					    <Grid container spacing={1}>
+							{basicFields.map((field,i) => (
+								<Grid item xs={field.width}>
+									<TextField
+								        id={field.id}
+								        label={field.label}
+								        type="search"
+								        value={this.state.basicFieldValues[i]}
+								        onChange={(e)=>{
+								        		this.handleBasicFieldChange(e.target.value,i);
+								        		//console.log(e.target.value)
+								        	}
+								        }
+								        className={classes.formField}
+								        placeholder={field.placeholder}
+								        fullWidth
+								        margin="normal"
+								        InputLabelProps={{
+								        	shrink: true,
+								        }}
+									/>
+								</Grid>))}
+						</Grid>
 					    <DropZone handleSetFiles={this.handleSetFiles}/>
 			  			<Typography variant="h7" color="inherit">
 			      			Quality Control Parameters
@@ -899,8 +958,10 @@ class BasicForm extends React.Component {
 
 			  	<Grid item xs={7} sm={7} md={7} component={Paper} className={classes.rightPane}>
 				  	<Container>
-					  	<Grid container spacing={1}>
-					  		{(this.state.umapCheck || this.state.tsneCheck || this.state.dptCheck || this.state.phateCheck || this.state.graphFACheck) && <Grid item sm={12} m={12} lg={12}>
+					  	<Grid container spacing={1} className={classes.expansionGrid}>
+					  		{(this.state.umapCheck || this.state.tsneCheck || this.state.dptCheck 
+					  			|| this.state.phateCheck || this.state.graphFACheck) && 
+					  			<Grid item sm={12} m={12} lg={12}>
 							  	<Card>
 							        <ExpansionPanel square>
 								        <ExpansionPanelSummary aria-controls="panel1a-content" id="panel1a-header">
@@ -1035,8 +1096,8 @@ class BasicForm extends React.Component {
 													<b>Dot Plot </b> - Dot color represents average expression level in a group while dot size represents percentage of cells expressing given gene
 													<br />
 													<b>Heat Map Plot </b> - Consecutive colored lines representing gene expression of individual cells 
-													<br />
-													<b>Violin Plot </b> - Violin plot of gene expression levels
+													{/*<br />
+													<b>Violin Plot </b> - Violin plot of gene expression levels*/}
 										        </DialogContent>
 										    </Dialog>
 
@@ -1078,7 +1139,7 @@ class BasicForm extends React.Component {
 														label={<Typography variant="subtitle2" color="inherit">Heat Map Plot</Typography>}
 													/>
 									    		</Grid>
-									    		<Grid item xs={4} sm={2}>
+									    		{/*<Grid item xs={4} sm={2}>
 										    		<FormControlLabel
 														control={<Checkbox 
 																	color="secondary" 
@@ -1087,7 +1148,7 @@ class BasicForm extends React.Component {
 																/>}
 														label={<Typography variant="subtitle2" color="inherit">Violin Plot</Typography>}
 													/>
-									    		</Grid>
+									    		</Grid>*/}
 										    </Grid>
 								        </ExpansionPanelDetails>
 								    </ExpansionPanel>
@@ -1125,53 +1186,6 @@ class BasicForm extends React.Component {
 													        className={classes.formField}
 													        value={this.state.diffExpFieldValues[i]}
 													        onChange={(e)=>{this.handleDiffExpFieldChange(e.target.value,i)}}
-													        defaultValue={field.defaultValue}
-													        fullWidth
-													        margin="normal"
-													        InputLabelProps={{
-													        	shrink: true,
-													        }}
-													    />
-												    </Grid>
-												))}
-										    </Grid>
-										 
-								        </ExpansionPanelDetails>
-								    </ExpansionPanel>
-						   		</Card>
-						   	</Grid>}
-						   	{(this.state.dptCheck) && <Grid item sm={12} m={12} lg={12}>
-							  	<Card>
-							        <ExpansionPanel square>
-								        <ExpansionPanelSummary aria-controls="panel1a-content" id="panel1a-header">
-								          	<Typography variant="h7" color="inherit" noWrap>
-									      		Diffusion Pseudotime Options
-									    	</Typography>
-									    	<IconButton className={classes.button} aria-label="info" onClick={this.handleDPTFieldClickOpen}>
-								    			<Info fontSize="small"/>
-								    		</IconButton>
-								    		<Dialog onClose={this.handleDPTFieldClose} aria-labelledby="simple-dialog-title" open={this.state.dptopen}>
-										        <DialogTitle id="simple-dialog-title" className={classes.infoTitle}>Diffusion Pseudotime Options</DialogTitle>
-										        <DialogContent className={classes.infoContent}>
-										        	<br/>
-											        <b>Category for Root Cell </b> - Category (e.g. leiden, sampleName, age, etc.) for identifying root cell type
-											        <br/>
-											        <b>Root Cell Group </b> - Group (e.g. Cluster 1, Sample_HT239, etc.) within category containing root cell type
-											        <br/>
-										        </DialogContent>
-										    </Dialog>
-
-								        </ExpansionPanelSummary>
-								        <ExpansionPanelDetails>
-									        <Grid container spacing={1}>
-								    			{dptFields.map((field,i) =>(
-								    				<Grid item xs={6} sm={6}>
-									    				<TextField
-													        id={field.id}
-													        label={field.label}
-													        className={classes.formField}
-													        value={this.state.dptFieldValues[i]}
-													        onChange={(e)=>{this.handleDPTFieldChange(e.target.value,i)}}
 													        defaultValue={field.defaultValue}
 													        fullWidth
 													        margin="normal"
@@ -1249,6 +1263,53 @@ class BasicForm extends React.Component {
 								    </ExpansionPanel>
 						   		</Card>
 					   		</Grid>}
+					   		{(this.state.dptCheck) && <Grid item sm={12} m={12} lg={12}>
+							  	<Card>
+							        <ExpansionPanel square>
+								        <ExpansionPanelSummary aria-controls="panel1a-content" id="panel1a-header">
+								          	<Typography variant="h7" color="inherit" noWrap>
+									      		Diffusion Pseudotime Options
+									    	</Typography>
+									    	<IconButton className={classes.button} aria-label="info" onClick={this.handleDPTFieldClickOpen}>
+								    			<Info fontSize="small"/>
+								    		</IconButton>
+								    		<Dialog onClose={this.handleDPTFieldClose} aria-labelledby="simple-dialog-title" open={this.state.dptopen}>
+										        <DialogTitle id="simple-dialog-title" className={classes.infoTitle}>Diffusion Pseudotime Options</DialogTitle>
+										        <DialogContent className={classes.infoContent}>
+										        	<br/>
+											        <b>Category for Root Cell </b> - Category (e.g. leiden, sampleName, age, etc.) for identifying root cell type
+											        <br/>
+											        <b>Root Cell Group </b> - Group (e.g. Cluster 1, Sample_HT239, etc.) within category containing root cell type
+											        <br/>
+										        </DialogContent>
+										    </Dialog>
+
+								        </ExpansionPanelSummary>
+								        <ExpansionPanelDetails>
+									        <Grid container spacing={1}>
+								    			{dptFields.map((field,i) =>(
+								    				<Grid item xs={6} sm={6}>
+									    				<TextField
+													        id={field.id}
+													        label={field.label}
+													        className={classes.formField}
+													        value={this.state.dptFieldValues[i]}
+													        onChange={(e)=>{this.handleDPTFieldChange(e.target.value,i)}}
+													        defaultValue={field.defaultValue}
+													        fullWidth
+													        margin="normal"
+													        InputLabelProps={{
+													        	shrink: true,
+													        }}
+													    />
+												    </Grid>
+												))}
+										    </Grid>
+										 
+								        </ExpansionPanelDetails>
+								    </ExpansionPanel>
+						   		</Card>
+						   	</Grid>}
 					   		{(this.state.extractCheck) && <Grid item sm={12} m={12} lg={12}>
 						   		<Card>
 							        <ExpansionPanel square>

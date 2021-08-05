@@ -42,9 +42,12 @@ export default function DropZone(props) {
                 console.log("onload working")
                 const bstr = reader.result;
                 const wb = XLSX.read(bstr, {type:"binary"});
-                const wsname=wb.SheetNames[0];
-                const ws = wb.Sheets[wsname];
-                const data = XLSX.utils.sheet_to_csv(ws, { header: 1 });
+                var data = "";
+                for (let i=0; i<wb.SheetNames.length; i++) {
+                    const wsname=wb.SheetNames[i];
+                    const ws = wb.Sheets[wsname];
+                    data = data.concat(XLSX.utils.sheet_to_csv(ws, { header: 1 }));
+                }
                 // console.log("Data>>>" + data);// shows that excel data is read
                 props.handleSetFiles(data)
 

@@ -62,7 +62,12 @@ class SCARunner:
 		*Note that pickled adata files are very large - min 4GB (make sure to clean out unused pickle files)
 		'''
 		if load_save: # See if there is already a save file for the analysis to duplicate
-			run_save = pickle.load(open(''.join([figdir,load_save]),"rb"))
+			if not '/' in load_save:
+				load_save_path = ''.join([figdir,load_save])
+			else:
+				load_save_path = 'load_save'
+
+			run_save = pickle.load(open(load_save_path,"rb"))
 
 			adata = run_save.adata.copy()
 			# sca_params.vmin_list = run_save.vmin_list
@@ -158,7 +163,12 @@ class SCARunner:
 
 		if not np.any([not cluster.isdigit() for cluster in extracted]):
 			## Load pickle file if one is given
-			run_save = pickle.load(open(''.join([figdir,load_save]),"rb"))
+
+			if not '/' in load_save:
+				load_save_path = ''.join([figdir,load_save])
+			else:
+				load_save_path = 'load_save'
+			run_save = pickle.load(open(load_save_path,"rb"))
 
 		
 			adata = sca_params.adata = run_save.adata
@@ -226,7 +236,11 @@ class SCARunner:
 			adata=adata_filtered.copy()
 		else:
 			if load_save: # need to read loom files for spliced/unspliced genes - make sure loaded data has that information
-				run_save = pickle.load(open(''.join([figdir,load_save]),"rb"))
+				if not '/' in load_save:
+					load_save_path = ''.join([figdir,load_save])
+				else:
+					load_save_path = 'load_save'
+				run_save = pickle.load(open(load_save_path,"rb"))
 
 				adata = run_save.adata.copy()
 				# sca_params.vmin_list = run_save.vmin_list
@@ -436,7 +450,11 @@ class SCARunner:
 		'''
 
 		if load_save: # See if there is already a save file for the analysis to duplicate
-			run_save = pickle.load(open(''.join([figdir,load_save]),"rb"))
+			if not '/' in load_save:
+				load_save_path = ''.join([figdir,load_save])
+			else:
+				load_save_path = 'load_save'
+			run_save = pickle.load(open(load_save_path,"rb"))
 
 			adata = run_save.adata.copy()
 			adata_ref = run_save.adata_ref

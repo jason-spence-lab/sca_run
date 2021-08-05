@@ -21,6 +21,8 @@ class plotting:
         Plot Params --
             size: Size of dots on all UMAP plots
             umap_obs: Metadata observations by which to color UMAP plots
+            dot_check: Plot dot plot figures based off of gene lists
+            heatmap_check: Plot heatmap figures based off of gene lists
             dot_grouping: Metadata observations by which to group dot plot rows
             umap_categorical_color: List of colors for UMAP groups (HEX codes or RGB tuples)
             umap_feature_color: Color scheme for UMAP gradient plots (yellow_blue or blue_orange)
@@ -32,6 +34,8 @@ class plotting:
         '''
         self.size = plot_params.size
         self.umap_obs = plot_params.umap_obs
+        self.dot_check = plot_params.dot_check
+        self.heatmap_check = plot_params.heatmap_check
         self.dot_grouping = plot_params.dot_grouping
         self.umap_categorical_color = plot_params.umap_categorical_color
         self.umap_feature_color = plot_params.umap_feature_color
@@ -61,8 +65,8 @@ class plotting:
             position=[0, 0.019999, 0.02, 0.55, 1]
             my_feature_cmap = self.make_cmap(feature_colors,bit=True,position=position)
         else:
-            feature_colors = [(210,210,210), (210,210,210), (245,245,200), (100,200,225), (0,45,125)]
-            position=[0, 0.019999, 0.02, 0.55, 1]
+            feature_colors = self.umap_feature_color[0]
+            position=self.umap_feature_color[1]
             my_feature_cmap = self.make_cmap(feature_colors,bit=True,position=position)
 
         gray_cmap = self.make_cmap([(220,220,220),(220,220,220)], bit=True)
@@ -86,7 +90,7 @@ class plotting:
         size = self.size
 
         # Check to see if user wants publication quality figures
-        if self.final_quality:
+        if self.final_quality=='high':
             # rcParams['figure.figsize'] = 4, 4
             rcParams['savefig.dpi']=1200
             file_type = '.pdf'
@@ -110,8 +114,10 @@ class plotting:
         ## Plot results of UMAP (and t-SNE) dimensional reduction and clustering
         for observation in self.umap_obs:
             legend = 'on data' if (observation==sca_params.analysis_params.clustering_choice) else 'right margin'
-            sc.pl.umap(adata, color=observation, save=''.join(['_',observation,file_type]), show=False,
-                       legend_loc=legend, edges=False, size=size, palette=colors, alpha=0.75)
+
+            if sca_params.analysis_params.umap_check:
+                sc.pl.umap(adata, color=observation, save=''.join(['_',observation,file_type]), show=False,
+                           legend_loc=legend, edges=False, size=size, palette=colors, alpha=0.75)
 
             if sca_params.analysis_params.do_tSNE:
                 sc.pl.tsne(adata, color=observation, save=''.join(['_',observation,file_type]), show=False, 
@@ -149,7 +155,8 @@ class plotting:
 
         if sca_params.qc_params.doublet_detection:
             import doubletdetection
-            sc.pl.umap(sca_params.adata_doublet, color=['doublet_label','doublet_score','n_genes','n_counts','percent_mito'], save='_doublet_test.pdf', show=False, edges=False, size=size)
+            if sca_params.analysis_params.umap_check:
+                sc.pl.umap(sca_params.adata_doublet, color=['doublet_label','doublet_score','n_genes','n_counts','percent_mito'], save='_doublet_test.pdf', show=False, edges=False, size=size)
             f = doubletdetection.plot.convergence(sca_params.doublet_clf, save=''.join([figdir,'convergence_test.pdf']), show=False, p_thresh=1e-16, voter_thresh=0.5)
             f3 = doubletdetection.plot.threshold(sca_params.doublet_clf, save=''.join([figdir,'threshold_test.pdf']), show=False, p_step=6)
 
@@ -164,8 +171,9 @@ class plotting:
 
                 ## Do FeaturePlots for select genes
                 print('Plotting standard marker genes: ',genes_to_plot,'\n')
-                sc.pl.umap(adata, color=genes_to_plot, save= ''.join(['_featureplots_',gene_list,file_type]), show=False, 
-                           cmap=my_feature_cmap, size=size, use_raw=True, vmin=0)
+                if sca_params.analysis_params.umap_check:
+                    sc.pl.umap(adata, color=genes_to_plot, save= ''.join(['_featureplots_',gene_list,file_type]), show=False, 
+                               cmap=my_feature_cmap, size=size, use_raw=True, vmin=0)
 
                 if sca_params.analysis_params.do_tSNE:
                     sc.pl.tsne(adata, color=genes_to_plot, save= ''.join(['_featureplots_',gene_list,file_type]), show=False, 
@@ -199,17 +207,18 @@ class plotting:
                             dendrogram = False
                             clustering_chosen = sca_params.analysis_params.clustering_choice
                             adata_plots.obs[clustering_chosen]=adata.obs[clustering_chosen].cat.reorder_categories(groupby_positions,inplace = False)
-
-                        sc.pl.dotplot(adata_plots, genes_to_plot, groupby=grouping, 
-                                var_group_positions=feature_positions, var_group_labels=feature_groups,
-                                save=''.join(['_markers_',gene_list,'_',grouping,file_type]), show=False, 
-                                color_map=my_feature_cmap, use_raw=True, dendrogram=dendrogram)#, figsize=(4,6))#, dot_max=0.4)#, dendrogram=True)
+                        if self.dot_check:
+                            sc.pl.dotplot(adata_plots, genes_to_plot, groupby=grouping, 
+                                    var_group_positions=feature_positions, var_group_labels=feature_groups,
+                                    save=''.join(['_markers_',gene_list,'_',grouping,file_type]), show=False, 
+                                    color_map=my_feature_cmap, use_raw=True, dendrogram=dendrogram)#, figsize=(4,6))#, dot_max=0.4)#, dendrogram=True)
                         ## Heatmaps
                         # Each horizontal line represents expression of one cell
-                        sc.pl.heatmap(adata_plots, genes_to_plot, groupby=grouping, 
-                                var_group_positions=feature_positions, var_group_labels=feature_groups,
-                                save=''.join(['_markers_',gene_list,'_',grouping,file_type]), show=False, 
-                                cmap=my_feature_cmap, use_raw=True)
+                        if self.heatmap_check:
+                            sc.pl.heatmap(adata_plots, genes_to_plot, groupby=grouping, 
+                                    var_group_positions=feature_positions, var_group_labels=feature_groups,
+                                    save=''.join(['_markers_',gene_list,'_',grouping,file_type]), show=False, 
+                                    cmap=my_feature_cmap, use_raw=True)
 
         # Genes that are not expressed or are invariable are plotted using a grayscale
         sca_params.missing_genes = missing_genes
@@ -238,12 +247,6 @@ class plotting:
         if sca_params.analysis_params.phate:
             sc.external.pl.phate(adata, color=missing_genes, save=''.join(['_featureplots_gray',file_type]), 
                     show=False, cmap=gray_cmap, size=size, use_raw=True)
-        
-        if sca_params.qc_params.doublet_detection:
-            import doubletdetection
-            sc.pl.umap(adata, color=['doublet_label'], save='_doublet_test.png', show=False, edges=False, size=size)
-            f = doubletdetection.plot.convergence(sca_params.doublet_clf, save=''.join([figdir,'convergence_test.pdf']), show=False, p_thresh=1e-16, voter_thresh=0.5)
-            f3 = doubletdetection.plot.threshold(sca_params.doublet_clf, save=''.join([figdir,'threshold_test.pdf']), show=False, p_step=6)
 
         # Generate a umap feature plot based on cell scoring
         if sca_params.cell_score_lists:
@@ -272,21 +275,14 @@ class plotting:
         if sca_params.analysis_params.dpt:
             sc.pl.diffmap(adata, color=['dpt_pseudotime', sca_params.analysis_params.clustering_choice], size=self.size, show=False,
                           save=''.join([sca_params.analysis_params.dpt[0],'.png']))
-            sc.pl.umap(adata, color='dpt_pseudotime', size=self.size, show=False,
-                       save=''.join(['_','dpt','_',sca_params.analysis_params.dpt[0],'.png']))
+            if sca_params.analysis_params.umap_check:
+                sc.pl.umap(adata, color='dpt_pseudotime', size=self.size, show=False,
+                           save=''.join(['_','dpt','_',sca_params.analysis_params.dpt[0],'.png']))
             # sc.pl.dpt_groups_pseudotime(adata, color_map=my_feature_cmap, 
             #                           save=''.join([sca_params.analysis_params.dpt[0],sca_params.analysis_params.dpt[1],'.png']))
             # sc.pl.dpt_timeseries(adata, color_map=my_feature_cmap, show=False,
             #                    save=''.join([sca_params.analysis_params.dpt[0],sca_params.analysis_params.dpt[1],'.png']))
 
-        # ## Violin plot for comparing gene expression among different groups/clusters
-        # # Create observation field labeled using binary information
-        # # Will have option integrated in pipeline in the future
-        # adata.obs['CDH5_exp'] = ['CDH5+' if (cell!=0) else 'CDH5-' for cell in adata.raw[:,'CDH5'].X] 
-
-        # # Built in scanpy module
-        # sc.pl.violin(adata, genes_to_plot+['CDH5'], groupby='CDH5_exp', jitter=True,
-        #   save='_feature.png', show=False, scale='width',use_raw=True) #order = ['CDH5+','CDH5-'],
         
         # Custom violin plot module -- Not complete/in testing
         df = pd.DataFrame()
@@ -295,15 +291,6 @@ class plotting:
             sigma = np.amax(adata.raw[:,gene].X)/40
             gene_df = [cell if (cell!=0) else np.random.normal(loc=0,scale=sigma) for cell in adata.raw[:,gene].X]
             df[gene] = gene_df
-
-        # df['CDH5_exp']=adata.obs['CDH5_exp'].values
-        # vplot, axes = plt.subplots(math.ceil(len(genes_to_plot)/4),4, figsize=(18,12))
-        # plt.rcParams.update({'font.size':12})
-        # plt.subplots_adjust(left=0.125, right=0.9, bottom=0.1, top=0.9, wspace=0.4, hspace=0.4)
-        # for i,gene in enumerate(genes_to_plot):
-        #   sns.violinplot(x='CDH5_exp', y=gene, data=df, inner=None, scale='width', ax=axes[math.floor(i/4),i%4])
-        #   sns.stripplot(x='CDH5_exp', y=gene, data=df, jitter = True, color='black', size=0.4, ax=axes[math.floor(i/4),i%4])
-        # vplot.savefig(''.join([figdir,'/violin_feature_jitter.png']))
 
         ## Scatter plots to identify clusters that are high in number of genes, UMI counts, and mito transcript fraction
         # adata.obs['jitter'] = np.random.rand(len(adata.obs_names))*10

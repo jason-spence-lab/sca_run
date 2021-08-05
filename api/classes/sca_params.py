@@ -85,6 +85,26 @@ class sca_params:
 
 		return
 
+	## Parse gene string received from front-end web application and store as gene lists
+	def read_gene_str(self,
+					  gene_str):
+		'''
+		gene_str: String of genes from web json
+		'''
+		gene_str = gene_str.replace("\nGene","/Gene").split("/")
+		for gene_list in gene_str:
+			gene_array = [row.split(",") for row in gene_list.split("\n")]
+			gene_array = gene_array[1:]
+			markers = [row[0] for row in gene_array]
+			label = gene_array[1][1]
+			cell_score_list = gene_array[3][1]
+			groupby_positions = gene_array[1][4]
+			self.add_gene_list(markers = markers,
+							   label=label,
+							   cell_score_list=cell_score_list,
+							   groupby_positions=groupby_positions)
+		return
+
 	## Creates object containing all of the filtering parameters and sets as attribute
 	def set_qc_params(self,
 					  min_cells=0,
@@ -120,6 +140,7 @@ class sca_params:
 					  min_mean=0.0125,
 					  max_mean=3,
 					  min_disp=0.5,
+					  n_top_genes=None,
 					  regress_out=['n_counts','percent_mito']):
 		'''
 		Preprocess Params --
@@ -127,12 +148,14 @@ class sca_params:
 			min_mean: Low cutoff for feature (gene) means
 			max_mean: High cutoff for feature (gene) means
 			min_disp: Low cutoff for feature (gene) dispersions
+			n_top_genes: Cutoff for the number of top genes to use in downstream analysis
 			regress_out: Variables to regress out, for example, percent_mito
 		'''
 		self.pp_params = pp_params(combat=combat,
 								   min_mean=min_mean,
 								   max_mean=max_mean,
 								   min_disp=min_disp,
+								   n_top_genes=n_top_genes,
 								   regress_out=regress_out)
 		return
 
@@ -143,11 +166,12 @@ class sca_params:
 	## Creates object containing all of the analysis parameters and sets as attribute
 	def set_analysis_params(self,
 							n_neighbors=30,
+							umap_check=True,
 							n_pcs=15,
 							spread=1,
 							min_dist=0.4,
 							resolution=0.4,
-							do_bbknn=False,
+							do_bbknn=None,
 							do_tSNE=False,
 							clustering_choice='leiden',
 							dpt=[],
@@ -158,13 +182,14 @@ class sca_params:
 		Analysis Params --
 			n_neighbors: Size of the local neighborhood used for manifold approximation
 			n_pcs: Number of principal components to use in construction of neighborhood graph
-			spread: In combination with min_dist determines how clumped embedded points are
-			min_dist: Minimum distance between points on the umap graph
+			umap_check: Run UMAP embedding if true
+			spread: In combination with min_dist determines how clumped embedded points are on UMAP
+			min_dist: Minimum distance between points on the UMAP graph
 			resolution: High resolution attempts to increases # of clusters identified
 			do_bbknn: Run batch balanced k-nearest neighbors batch correction algorithm
 			do_tSNE: Run tSNE dimensional reduction analysis
 			clustering_choice: Run leiden clustering or louvain clustering based on user's choice. Default is leiden clustering 
-			dpt: Run diffusion pseudotime analysis with input: ['metadata_cat','group']
+			dpt: Run diffusion pseudotime analysis with input: ['metadata_cat',['group']]
 			draw_force_atlas: Run force-directed graphing of data
 			umap_init_pos: Basis from which to initiate umap embedding ('paga','spectra','random')
 			phate: Run Potential of Heat-diffusion for Affinity-based Trajectory Embedding (PHATE)
@@ -172,6 +197,7 @@ class sca_params:
 
 		self.analysis_params = analysis_params(n_neighbors=n_neighbors,
 											   n_pcs=n_pcs,
+											   umap_check=umap_check,
 											   spread=spread,
 											   min_dist=min_dist,
 											   resolution=resolution,
@@ -192,6 +218,8 @@ class sca_params:
 	def set_plot_params(self,
 						size=20,
 						umap_obs=['sampleName','leiden'],
+						dot_check=True,
+						heatmap_check=False,
 						dot_grouping=['sampleName','leiden'],
 						umap_categorical_color='default',
 						umap_feature_color='yellow_blue',
@@ -204,7 +232,9 @@ class sca_params:
 		Plot Params -- 
 			size: Size of dots on all UMAP plots
 			umap_obs: Metadata observations by which to color UMAP plots
-			dot_grouping: Metadata observations by which to group dot plot rows
+			dot_check: Plot dot plot figures based off of gene lists
+			heatmap_check: Plot heatmap figures based off of gene lists
+			dot_grouping: Metadata observations by which to group dot plot and heatmap rows
 			umap_categorical_color: List of colors for UMAP groups (HEX codes or RGB tuples)
 			umap_feature_color: Color scheme for UMAP gradient plots (yellow_blue or blue_orange)
 			vmin_list: List of y-axis minimums for cell scoring feature plots
@@ -213,9 +243,13 @@ class sca_params:
 			clusters2_compare: Clusters to compare for differential gene analysis
 			final_quality: Makes high resolution figures in pdf
 		'''
+		if not (dot_check or heatmap_check):
+			dot_grouping=None
 
 		self.plot_params = plot_params(size=size,
 									   umap_obs=umap_obs,
+									   dot_check=dot_check,
+									   heatmap_check=heatmap_check,
 									   dot_grouping=dot_grouping,
 									   umap_categorical_color=umap_categorical_color,
 									   umap_feature_color=umap_feature_color,
@@ -381,7 +415,7 @@ class qc_params:
 	min_genes: int=500
 	max_genes: int=7000
 	max_counts: int=30000
-	max_mito: float=10
+	max_mito: int=10
 	doublet_detection: bool=False
 
 @dataclass
@@ -392,12 +426,14 @@ class pp_params:
 		min_mean: Low cutoff for feature (gene) means
 		max_mean: High cutoff for feature (gene) means
 		min_disp: Low cutoff for feature (gene) dispersions
+		n_top_genes: Cutoff for the number of top genes to use in downstream analysis
 		regress_out: Variables to regress out, for example, percent_mito
 	'''
-	combat: str='None'
-	min_mean: int=0.0125
-	max_mean: int=3
-	min_disp: int=0.5
+	combat: str=None
+	min_mean: float=0.0125
+	max_mean: float=3
+	min_disp: float=0.5
+	n_top_genes: int=None
 	regress_out: List[str] = field(default_factory=lambda: ['n_counts','percent_mito'])
 
 @dataclass
@@ -406,23 +442,25 @@ class analysis_params:
 	Analysis Params DataClass --
 		n_neighbors: Size of the local neighborhood used for manifold approximation
 		n_pcs: Number of principal components to use in construction of neighborhood graph
+		umap_check: Run UMAP embedding if true
 		spread: In combination with min_dist determines how clumped embedded points are
 		min_dist: Minimum distance between points on the umap graph
 		resolution: High resolution attempts to increases # of clusters identified
 		do_bbknn: Run batch balanced k-nearest neighbors batch correction algorithm
 		do_tSNE: Run tSNE clustering analysis
 		clustering_choice: Run leiden clustering or louvain clustering based on user's choice
-		dpt: Run diffusion pseudotime analysis with input: ['metadata_cat','group']
+		dpt: Run diffusion pseudotime analysis with input: ['metadata_cat',['group']]
 		draw_force_atlas: Run force-directed graphing of data
 		umap_init_pos: Basis from which to initiate umap embedding ('paga','spectra','random')
 		phate: Run Potential of Heat-diffusion for Affinity-based Trajectory Embedding (PHATE)
 	'''
 	n_neighbors: int=30
 	n_pcs: int=15
+	umap_check: bool=True
 	spread: int=1
 	min_dist: float=0.4
 	resolution: float=0.4
-	do_bbknn: bool=False
+	do_bbknn: str=None
 	do_tSNE: bool=False
 	clustering_choice: str="leiden"
 	dpt: List[str] = field(default_factory=lambda: ['leiden',['0']])
@@ -436,6 +474,8 @@ class plot_params:
 	Plot Params DataClass --
 		size: Size of dots on all UMAP plots
 		umap_obs: Metadata observations by which to color UMAP plots
+		dot_check: Plot dot plot figures based off of gene lists
+		heatmap_check: Plot heatmap figures based off of gene lists
 		dot_grouping: Metadata observations by which to group dot plot rows
 		umap_categorical_color: List of colors for UMAP groups (HEX codes or RGB tuples)
 		umap_feature_color: Color scheme for UMAP gradient plots (yellow_blue or blue_orange)
@@ -447,6 +487,8 @@ class plot_params:
 	'''
 	size: int=20
 	umap_obs: List[str] = field(default_factory=lambda: ['sampleName','leiden'])
+	dot_check: bool=True
+	heatmap_check: bool=False
 	dot_grouping: List[str] = field(default_factory=lambda: ['sampleName','leiden'])
 	umap_categorical_color: List[str] = field(default_factory=lambda: ['default'])
 	umap_feature_color: str='yellow_blue'

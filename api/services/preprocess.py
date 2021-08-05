@@ -20,6 +20,7 @@ class preprocess:
 		    min_mean: Low cutoff for feature (gene) means
 		    max_mean: High cutoff for feature (gene) means
 		    min_disp: Low cutoff for feature (gene) dispersions
+		    n_top_genes: Cutoff for the number of top genes to use in downstream analysis
 		    regress_out: Variables to regress out, for example, percent_mito
 		'''
 		self.gene_dict = gene_dict
@@ -27,6 +28,7 @@ class preprocess:
 		self.min_mean = pp_params.min_mean
 		self.max_mean = pp_params.max_mean
 		self.min_disp = pp_params.min_disp
+		self.n_top_genes = pp_params.n_top_genes
 		self.regress_out = pp_params.regress_out
 		self.adata_unscaled = None
 
@@ -54,7 +56,8 @@ class preprocess:
 					adata.obs[key] = adata_scaled.X[:,adata_scaled.var_names.isin(self.gene_dict[key].markers)].mean(1)
 
 		## Identify highly-variable genes based on dispersion relative to expression level
-		sc.pp.highly_variable_genes(adata, min_mean=self.min_mean, max_mean=self.max_mean, min_disp=self.min_disp)
+		sc.pp.highly_variable_genes(adata, min_mean=self.min_mean, max_mean=self.max_mean, 
+									min_disp=self.min_disp, n_top_genes=self.n_top_genes)
 
 		## Filter the genes to remove non-variable genes since they are uninformative
 		adata = adata[:, adata.var['highly_variable']].copy()
@@ -62,7 +65,7 @@ class preprocess:
 		## Regress out effects of total reads per cell and the percentage of mitochondrial genes expressed.
 		sc.pp.regress_out(adata, self.regress_out)
 
-		if not self.combat is 'None':
+		if self.combat:
 			print("Conducting combat batch correction")
 			sc.pp.combat(adata, key=self.combat)
 

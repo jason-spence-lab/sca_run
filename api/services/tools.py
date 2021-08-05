@@ -16,19 +16,21 @@ class tools:
 		Analysis Params --
 			n_neighbors: Size of the local neighborhood used for manifold approximation
 			n_pcs: Number of principal components to use in construction of neighborhood graph
+			umap_check: Run UMAP embedding if true
 			spread: In combination with min_dist determines how clumped embedded points are
 			min_dist: Minimum distance between points on the umap graph
 			resolution: High resolution attempts to increases # of clusters identified
 			do_bbknn: Run batch balanced k-nearest neighbors batch correction algorithm
 			do_tSNE: Run tSNE dimensional reduction analysis
 			clustering_choice: Run leiden clustering or louvain clustering based on user's choice. Default is leiden clustering 
-			dpt: Run diffusion pseudotime analysis with input: ['metadata_cat','group']
+			dpt: Run diffusion pseudotime analysis with input: ['metadata_cat',['group']]
 			draw_force_atlas: Run force-directed graphing of data
 			umap_init_pos: Basis from which to initiate umap embedding ('paga','spectra','random')
 			phate: Run Potential of Heat-diffusion for Affinity-based Trajectory Embedding (PHATE)
 		'''
 		self.n_neighbors = analysis_params.n_neighbors
 		self.n_pcs = analysis_params.n_pcs
+		self.umap_check = analysis_params.umap_check
 		self.spread = analysis_params.spread
 		self.min_dist = analysis_params.min_dist
 		self.resolution = analysis_params.resolution
@@ -53,7 +55,7 @@ class tools:
 		# Note that doing this may override previous sc.pp.neighbors()
 		if self.do_bbknn:
 			import bbknn
-			bbknn.bbknn(adata, batch_key='sampleName', copy=False)#, 
+			bbknn.bbknn(adata, batch_key=self.do_bbknn, copy=False)#, 
 						# n_pcs=self.n_pcs, neighbors_within_batch=self.n_neighbors)
 			#sc.pp.external.mnn_correct(adata,batch_key='sampleName') # Testing another algorithm
 		else:
@@ -80,12 +82,14 @@ class tools:
 			title='PAGA: Fruchterman Reingold',frameon=False)
 
 		## Run UMAP Dim reduction
-		sc.tl.umap(adata, spread=self.spread, min_dist=self.min_dist, init_pos=self.umap_init_pos)#, n_components=50) # Min_dist needs to be between 0.01 to 0.5
+		if self.umap_check:
+			sc.tl.umap(adata, spread=self.spread, min_dist=self.min_dist, init_pos=self.umap_init_pos)#, n_components=50) # Min_dist needs to be between 0.01 to 0.5
 
 		## Run tSNE analysis
 		if self.do_tSNE:
 			sc.tl.tsne(adata, n_pcs=self.n_pcs)
 
+		# Graph Force Atlas
 		if self.draw_force_atlas:
 			adata_fa = adata.raw.to_adata().copy()
 			sc.pp.highly_variable_genes(adata_fa, min_mean=0.0125, max_mean=3, min_disp=0.5)
@@ -93,7 +97,7 @@ class tools:
 
 			if self.do_bbknn:
 				import bbknn
-				bbknn.bbknn(adata_fa, batch_key='sampleName', copy=False)#, 
+				bbknn.bbknn(adata_fa, batch_key=self.do_bbknn, copy=False)#, 
 							# n_pcs=self.n_pcs, neighbors_within_batch=self.n_neighbors)
 				#sc.pp.external.mnn_correct(adata,batch_key='sampleName') # Testing another algorithm
 			else:
@@ -112,7 +116,7 @@ class tools:
 
 			if self.do_bbknn:
 				import bbknn
-				bbknn.bbknn(adata_dpt, batch_key='sampleName', copy=False)#, 
+				bbknn.bbknn(adata_dpt, batch_key=self.do_bbknn, copy=False)#, 
 							# n_pcs=self.n_pcs, neighbors_within_batch=self.n_neighbors)
 				#sc.pp.external.mnn_correct(adata,batch_key='sampleName') # Testing another algorithm
 			else:

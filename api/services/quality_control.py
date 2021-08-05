@@ -48,7 +48,7 @@ class quality_control:
 		# Conducting DoubletDetector analysis by Jonathan Shor
 		if self.doublet_detection:
 			print("Starting doublet detection")
-			import doubletdetection
+			import DoubletDetection as doubletdetection
 			self.doublet_clf = doubletdetection.BoostClassifier(n_iters=50, use_phenograph=False, standard_scaling=True)
 			adata.obs['doublet_label'] = self.doublet_clf.fit(adata.X).predict(p_thresh=1e-16, voter_thresh=0.5)
 			adata.obs['doublet_score'] = self.doublet_clf.doublet_score()
