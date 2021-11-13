@@ -69,6 +69,7 @@ Give an example
 
 ## Authors
 
+* **Zhiwei Xiao** xzhiwei@umich.edu
 * **Joshua Wu** wujos@med.umich.edu
 * **Mike Czerwinski** czerwmj@med.umich.edu
 
